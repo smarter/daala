@@ -28,6 +28,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # include "../include/daala/codec.h"
 # include "odintrin.h"
 
+#if !defined(M_SQRT2)
+# define M_SQRT2 (1.41421356237309504880168872420970)
+#endif
+
 # if defined(_MSC_VER)
 #  define _USE_MATH_DEFINES
 # elif OD_GNUC_PREREQ(4,2)

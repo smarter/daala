@@ -319,7 +319,7 @@ void od_single_band_encode(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int ln,
          coeffs, strides);
         /*Lambda = 1*/
         mode = od_intra_pred_search(mode_cdf, mode_dist,
-         OD_INTRA_NMODES, 256);
+         OD_INTRA_NMODES, 0);
         (*OD_INTRA_GET[ln])(pred, coeffs, strides, mode);
         od_ec_encode_cdf_unscaled(&enc->ec, mode, mode_cdf, OD_INTRA_NMODES);
         mode_bits -= M_LOG2E*log(

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 ENCODER_EXAMPLE=$1
 DUMP_VIDEO=$2
@@ -12,7 +12,7 @@ BASENAME=$(basename $FILE)
 rm $BASENAME.out 2> /dev/null
 echo $BASENAME
 
-for x in {2..40}; do
+for x in 10 30 59 102 117 179 204; do
   OD_LOG_MODULES='encoder:10' $ENCODER_EXAMPLE -v $x $FILE -o $TMP_DIR/$BASENAME-$x.ogv 2> $TMP_DIR/$BASENAME-$x-enc.out
   PIXELS=$(cat $TMP_DIR/$BASENAME-$x-enc.out | grep 'Plane 0' | sed -re 's/^.*Pixels:\ +([0-9]+).*$/\1/')
   PSNR=$(cat $TMP_DIR/$BASENAME-$x-enc.out | grep 'Plane 0' | sed -re 's/^.*PSNR:\ +([0-9\.]+).*$/\1/')
