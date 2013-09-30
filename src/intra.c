@@ -138,6 +138,15 @@ const od_intra_dist_func OD_INTRA_DIST[OD_NBSIZES+1]={
   od_intra_pred16x16_dist
 };
 
+static int od_weighted_dist(od_coeff c, od_coeff p, ogg_int16_t weight) {
+  int q = 1;
+  double diff = fabs(c - p);
+  double dist1 = 256 * diff * diff;
+  double dist2 = diff * weight * q * q * M_SQRT2 / 6.0;
+  /*return diff;*/
+  return OD_MINI((int)round(dist1 * 100), (int)round(dist2 * 100));
+}
+
 void od_intra_pred4x4_dist(ogg_uint32_t *dist, const od_coeff *c,
  int stride, od_coeff *neighbors[4], int neighbor_strides[4]) {
   double p[4*4];
@@ -150,8 +159,8 @@ void od_intra_pred4x4_dist(ogg_uint32_t *dist, const od_coeff *c,
     satd = 0;
     for (i = 0;i<4;i++){
       for (j = 0; j < 4 ; j++) {
-        satd += abs(floor(c[stride*i + j] - p[i*4 + j] + 0.5))*
-         OD_SATD_WEIGHTS_4x4[i*4 + j];
+        satd += od_weighted_dist(c[stride*i + j], p[i*4 + j],
+                                 OD_SATD_WEIGHTS_4x4[i*4 + j]);
       }
     }
     dist[mode] = satd;
@@ -170,8 +179,8 @@ void od_intra_pred8x8_dist(ogg_uint32_t *dist, const od_coeff *c,
     satd = 0;
     for (i = 0; i < 8; i++) {
       for (j = 0; j < 8; j++) {
-        satd += abs(floor(c[stride*i + j] - p[i*8 + j] + 0.5))*
-         OD_SATD_WEIGHTS_8x8[i*8 + j];
+        satd += od_weighted_dist(c[stride*i + j], p[i*8 + j],
+                                 OD_SATD_WEIGHTS_8x8[i*8 + j]);
       }
     }
     dist[mode] = satd;
@@ -190,8 +199,8 @@ void od_intra_pred16x16_dist(ogg_uint32_t *dist, const od_coeff *c,
     satd = 0;
     for (i = 0; i < 16; i++) {
       for (j = 0; j < 16; j++) {
-        satd += abs(floor(c[stride*i + j] - p[i*16 + j] + 0.5))*
-          OD_SATD_WEIGHTS_16x16[i*16 + j];
+        satd += od_weighted_dist(c[stride*i + j], p[i*16 + j],
+                                 OD_SATD_WEIGHTS_16x16[i*16 + j]);
       }
     }
     dist[mode] = satd;
