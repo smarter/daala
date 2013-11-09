@@ -1,4 +1,4 @@
-const int OD_PRED_MULTS_8x8[OD_INTRA_NMODES][8][8]={
+const int OD_PRED_MULTS_8x8[OD_INTRA_NMODES][8][8] = {
 /* Mode 0 */
   {
     {  48,   8,   2,   2,   3,   5,   5,   7   },
@@ -1523,7 +1523,7 @@ const ogg_uint16_t OD_PRED_INDEX_8x8[2560]={
   0xd6,
 /* Mode 1 (7 2) */
 /* Mode 1 (0 3) */
-  0x18,0x20,0x48,0x50,0x78,0xa0,0xd0,0xd8,0xd9,0xda,0xe0,
+  0x18, 0x20, 0x48, 0x50, 0x78, 0xa0, 0xd0, 0xd8, 0xd9, 0xda, 0xe0,
 /* Mode 1 (1 3) */
   0x49,
 /* Mode 1 (2 3) */
@@ -1781,26 +1781,26 @@ const ogg_uint16_t OD_PRED_INDEX_8x8[2560]={
 /* Mode 3 (4 4) */
   0xe4,
 /* Mode 3 (5 4) */
-  0x55,0xe7,
+  0x55, 0xe7,
 /* Mode 3 (6 4) */
 /* Mode 3 (7 4) */
 /* Mode 3 (0 5) */
-  0xa8,0xe0,0xe8,0xe9,0xf0,
+  0xa8, 0xe0, 0xe8, 0xe9, 0xf0,
 /* Mode 3 (1 5) */
-  0xea,0xeb,
+  0xea, 0xeb,
 /* Mode 3 (2 5) */
 /* Mode 3 (3 5) */
-  0x63,0xeb,
+  0x63, 0xeb,
 /* Mode 3 (4 5) */
-  0x64,0xec,
+  0x64, 0xec,
 /* Mode 3 (5 5) */
   0xee,
 /* Mode 3 (6 5) */
-  0x66,0x7e,
+  0x66, 0x7e,
 /* Mode 3 (7 5) */
   0x67,
 /* Mode 3 (0 6) */
-  0x30,0x38,0x78,0xe8,0xf0,0xf1,0xf8,
+  0x30, 0x38, 0x78, 0xe8, 0xf0, 0xf1, 0xf8,
 /* Mode 3 (1 6) */
 /* Mode 3 (2 6) */
 /* Mode 3 (3 6) */
@@ -1811,9 +1811,9 @@ const ogg_uint16_t OD_PRED_INDEX_8x8[2560]={
 /* Mode 3 (6 6) */
 /* Mode 3 (7 6) */
 /* Mode 3 (0 7) */
-  0x70,0x78,0xa8,0xb8,0xf0,0xf8,0xf9,
+  0x70, 0x78, 0xa8, 0xb8, 0xf0, 0xf8, 0xf9,
 /* Mode 3 (1 7) */
-  0xf9,0xfa,
+  0xf9, 0xfa,
 /* Mode 3 (2 7) */
   0xf9,
 /* Mode 3 (3 7) */
@@ -2135,9 +2135,9 @@ const ogg_uint16_t OD_PRED_INDEX_8x8[2560]={
 /* Mode 6 (6 5) */
 /* Mode 6 (7 5) */
 /* Mode 6 (0 6) */
-  0x31,0x70,0x78,0xb0,0xf0,0xf1,
+  0x31, 0x70, 0x78, 0xb0, 0xf0, 0xf1,
 /* Mode 6 (1 6) */
-  0xf0,0xf1,
+  0xf0, 0xf1,
 /* Mode 6 (2 6) */
   0xf2,
 /* Mode 6 (3 6) */
@@ -2500,7 +2500,7 @@ const ogg_uint16_t OD_PRED_INDEX_8x8[2560]={
 const int OD_PRED_OFFSETS_8x8[OD_INTRA_NMODES] = {
   0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2304
 };
-const ogg_int16_t OD_SATD_WEIGHTS_8x8[8*8]={
+const ogg_int16_t OD_SATD_WEIGHTS_8x8[8*8] = {
    5,   7,  12,  16,  22,  26,  33,  37,
    6,   9,  15,  20,  28,  33,  42,  47,
   11,  15,  24,  30,  40,  46,  57,  62,
