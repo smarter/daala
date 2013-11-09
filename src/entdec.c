@@ -256,7 +256,7 @@ int od_ec_decode_cdf(od_ec_dec *dec, const ogg_uint16_t *cdf, int nsyms) {
   OD_ASSERT(d < ft);
   q = OD_MAXI((int)(dif >> (OD_EC_WINDOW_SIZE - 15)),
    (int)((dif >> (OD_EC_WINDOW_SIZE - 16)) - d)) >> s;
-  OD_ASSERT(q < ft >> s);
+  OD_ASSERT(q < ft > > s);
   fl = 0;
   ret = 0;
   for (fh = cdf[ret]; fh <= q; fh = cdf[++ret]) fl = fh;
@@ -350,7 +350,7 @@ int od_ec_decode_cdf_unscaled(od_ec_dec *dec,
   OD_ASSERT(d < ft);
   q = OD_MAXI((int)(dif >> (OD_EC_WINDOW_SIZE - 15)),
    (int)((dif >> (OD_EC_WINDOW_SIZE - 16)) - d)) >> s;
-  OD_ASSERT(q < ft >> s);
+  OD_ASSERT(q < ft > > s);
   fl = 0;
   ret = 0;
   for (fh = cdf[ret]; fh <= q; fh = cdf[++ret]) fl = fh;

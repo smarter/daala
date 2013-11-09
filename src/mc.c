@@ -2417,8 +2417,8 @@ static void od_mc_blend_multi_split8(unsigned char *dst, int dystride,
      + (drc[2] + o + xblk_sz)[i2]) << (log_blk_sz2 - 1))
      + c - g + round) >> log_blk_sz2);
     (dst + dystride)[i2 + 1] = OD_CLAMP255(
-     ((((src[2] + o + xblk_sz)[i2 + 1] +
-     (drc[2] + o + xblk_sz)[i2 + 1]) << (log_blk_sz2 - 1))
+     ((((src[2] + o + xblk_sz)[i2 +
+     1] + (drc[2] + o + xblk_sz)[i2 + 1]) << (log_blk_sz2 - 1))
      + d - h + round) >>log_blk_sz2);
   }
   /*Lower-right quadrant, last row and column.*/
@@ -2476,25 +2476,27 @@ static void od_mc_blend8(od_state *state, unsigned char *dst, int dystride,
 
 void od_mc_predict8(od_state *state, unsigned char *dst, int dystride,
  const unsigned char *src, int systride,
-                    const ogg_int32_t mvx[4], /*this is x coord for the four
+ const ogg_int32_t mvx[4],                    /*this is x coord for the four
                                                motion vectors of the four
                                                corners (in rotation not
                                                raster order) */
  const ogg_int32_t mvy[4],
-                    int interp_type, /* type of interpolation (bbbv for now) */
-                    int oc,  /* index of outside corner  */
-                    int s, /* two split flags that indicate if the corners are split*/
-                    int log_xblk_sz,   /* log 2 of block size */
-                    int log_yblk_sz
-) {
+ int interp_type,                    /* type of interpolation (bbbv for now) */
+ int oc,                     /* index of outside corner  */
+ int s,                    /* two split flags that indicate if the corners are
+                             split*/
+ int log_xblk_sz,                      /* log 2 of block size */
+ int log_yblk_sz
+ ) {
   const unsigned char *pred[4];
   unsigned char __attribute__((aligned(16))) buf[4][16*16];
   int r;
-  r=0;
+  r = 0;
   switch (interp_type) {
-    case OD_MC_INTERP_VVVV: {
+    case OD_MC_INTERP_VVVV:
+    {
       od_mc_predict1imv8(state, dst, dystride, src, systride,
-       mvx, mvy, MIDXS[0]/*0, 1, 2, 3*/, 0, log_xblk_sz, log_yblk_sz);
+       mvx, mvy, MIDXS[0] /*0, 1, 2, 3*/, 0, log_xblk_sz, log_yblk_sz);
       break;
     }
     case OD_MC_INTERP_VVVB: r++;
@@ -2734,7 +2736,8 @@ This last compare is unneeded for a median:
    down and to the righ.*/
 int od_mv_level1_prob(od_mv_grid_pt **grid, int vx, int vy) {
   const int probs[3][3] =
-   {{28323, 30610, 32128}, {18468, 21082, 24253}, {10799, 12839, 14144}};
+  { { 28323, 30610,
+      32128 }, { 18468, 21082, 24253 }, { 10799, 12839, 14144 } };
   od_mv_grid_pt *vur;
   od_mv_grid_pt *vdr;
   od_mv_grid_pt *vdl;
@@ -2930,47 +2933,50 @@ int main(void) {
            sizeof(img[0]), mvx, mvy, etype, c, s1, s3,
            log_blk_sz - 1, log_blk_sz - 1);
           memset(mismatch[c][0], 0, sizeof(mismatch[c]));
-          switch(c) {
-            case 0: {
-              for (x = 0; x < blk_sz >> 1; x++) {
+          switch (c) {
+            case 0:
+            {
+              for (x = 0; x < blk_sz > > 1; x++) {
                 if (dst2[c][0][x] != dst[0][x]) mismatch[c][0][x]++;
               }
-              for (y = 1; y < blk_sz >> 1; y++) {
+              for (y = 1; y < blk_sz > > 1; y++) {
                 if (dst2[c][y][0] != dst[y][0]) mismatch[c][y][0]++;
               }
               break;
             }
-            case 1: {
-              for (x = 0; x < blk_sz >> 1; x++) {
+            case 1:
+            {
+              for (x = 0; x < blk_sz > > 1; x++) {
                 if (dst2[c][0][x] != dst[0][x + (blk_sz >> 1)]) {
                   mismatch[c][0][x]++;
                 }
               }
-              for (y = 1; y < blk_sz >> 1; y++) {
+              for (y = 1; y < blk_sz > > 1; y++) {
                 if (dst2[c][y][blk_sz >> 1] != dst[y][blk_sz]) {
                   mismatch[c][y][blk_sz >> 1]++;
                 }
               }
-              for (y = 0; y < blk_sz >> 1; y++) {
+              for (y = 0; y < blk_sz > > 1; y++) {
                 if (dst2[c][y][0] != dst2[0][y][blk_sz >> 1]) {
                   mismatch[c][y][0]++;
                 }
               }
               break;
             }
-            case 2: {
-              for (x = 0; x < blk_sz >> 1; x++) {
+            case 2:
+            {
+              for (x = 0; x < blk_sz > > 1; x++) {
                 if (dst2[c][0][x] != dst2[1][blk_sz >> 1][x]) {
                   mismatch[c][0][x]++;
                 }
               }
-              for (y = 0; y < blk_sz >> 1; y++) {
+              for (y = 0; y < blk_sz > > 1; y++) {
                 if (dst2[c][y][blk_sz >> 1] !=
                  dst[y + (blk_sz >> 1)][blk_sz]) {
                   mismatch[c][y][blk_sz >> 1]++;
                 }
               }
-              for (x = 0; x < blk_sz >> 1; x++) {
+              for (x = 0; x < blk_sz > > 1; x++) {
                 if (dst2[c][blk_sz >> 1][x] !=
                  dst[blk_sz][x + (blk_sz >> 1)]) {
                   mismatch[c][blk_sz >> 1][x]++;
@@ -2978,23 +2984,24 @@ int main(void) {
               }
               break;
             }
-            case 3: {
-              for (x = 0; x < blk_sz >> 1; x++) {
-                if (dst2[c][0][x] != dst2[0][ blk_sz >> 1][x]) {
+            case 3:
+            {
+              for (x = 0; x < blk_sz > > 1; x++) {
+                if (dst2[c][0][x] != dst2[0][blk_sz >> 1][x]) {
                   mismatch[c][0][x]++;
                 }
               }
-              for (y = 1; y < blk_sz >> 1; y++) {
+              for (y = 1; y < blk_sz > > 1; y++) {
                 if (dst2[c][y][blk_sz >> 1] != dst2[2][y][0]) {
                   mismatch[c][y][blk_sz >> 1]++;
                 }
               }
-              for (x = 0; x < blk_sz >> 1; x++) {
+              for (x = 0; x < blk_sz > > 1; x++) {
                 if (dst2[c][blk_sz >> 1][x] != dst[blk_sz][x]) {
                   mismatch[c][blk_sz >> 1][x]++;
                 }
               }
-              for (y = 0; y < blk_sz >> 1; y++) {
+              for (y = 0; y < blk_sz > > 1; y++) {
                 if (dst2[c][y][0] != dst[y + (blk_sz >> 1)][0]) {
                   mismatch[c][y][0]++;
                 }
@@ -3002,8 +3009,8 @@ int main(void) {
               break;
             }
           }
-          for (y = 0; y < blk_sz >> 1; y++) {
-            for (x = 0; x < blk_sz >> 1; x++) {
+          for (y = 0; y < blk_sz > > 1; y++) {
+            for (x = 0; x < blk_sz > > 1; x++) {
               printf("%c%2X", mismatch[c][y][x] ? '!' : ' ', dst2[c][y][x]);
             }
             printf("\n");

@@ -56,7 +56,8 @@ void od_band_pseudo_dezigzag(od_coeff *dst,  int stride, od_coeff *src,
  int n, int interleave);
 
 int quant_pvq_theta(ogg_int32_t *x0, const ogg_int32_t *r0,
- ogg_int16_t *scale0, int *y, int n, int q0, int *qg, int shift, int intra);
+ ogg_int16_t *scale0,
+ int *y, int n, int q0, int *qg, int shift, int intra);
 
 int pvq_unquant_k(const ogg_int32_t *_r, int _n, int _qg, int _scale,
  int shift, int intra);

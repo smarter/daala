@@ -37,7 +37,7 @@ extern const od_intra_mult_func OD_INTRA_MULT[OD_NBSIZES+1];
 
 extern const double OD_INTRA_PRED_WEIGHTS_4x4[OD_INTRA_NMODES][4][4][2*4][2*4];
 extern const unsigned char OD_INTRA_PRED_PROB_4x4[3]
- [OD_INTRA_NMODES][OD_INTRA_NCONTEXTS];
+[OD_INTRA_NMODES][OD_INTRA_NCONTEXTS];
 
 void od_intra_pred4x4_mult(double *_p, int _pred_stride,
  od_coeff *_neighbors[4], int _neighbor_strides[4], int _mode);
@@ -87,11 +87,11 @@ extern const int OD_INTRA_CHROMA_WEIGHTS_Q8[OD_INTRA_NMODES][3];
 
 void od_chroma_pred(od_coeff *p, const od_coeff *c, const od_coeff *l,
  int stride, int bx, int by, int ln, int xdec, int ydec,
-  const unsigned char *bsize, int bstride, const int weights_q8[3]);
+ const unsigned char *bsize, int bstride, const int weights_q8[3]);
 
 void od_intra_pred_cdf(ogg_uint16_t _cdf[],
- const unsigned char _probs[][OD_INTRA_NCONTEXTS],const ogg_uint16_t _p0[],
- int _nmodes,int _left,int _upleft,int _up);
+ const unsigned char _probs[][OD_INTRA_NCONTEXTS], const ogg_uint16_t _p0[],
+ int _nmodes, int _left, int _upleft, int _up);
 
 int od_intra_pred_search(const ogg_uint16_t _cdf[],
  const ogg_uint32_t _dist[], int _nmodes, ogg_uint16_t _lambda);

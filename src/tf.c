@@ -39,7 +39,7 @@ void od_tf_up_h_lp(od_coeff *dst, int dstride,
   int x;
   int y;
   for (y = 0; y < n; y++) {
-    for (x = 0; x < n >> 1; x++) {
+    for (x = 0; x < n > > 1; x++) {
       od_coeff ll;
       od_coeff lh;
       int hswap;
@@ -60,7 +60,7 @@ void od_tf_up_v_lp(od_coeff *dst, int dstride,
  const od_coeff *src, int sstride, int dy, int n) {
   int x;
   int y;
-  for (y = 0; y < n >> 1; y++) {
+  for (y = 0; y < n > > 1; y++) {
     int vswap;
     vswap = y & 1;
     for (x = 0; x < n; x++) {
@@ -82,10 +82,10 @@ void od_tf_up_hv_lp(od_coeff *dst, int dstride,
  const od_coeff *src, int sstride, int dx, int dy, int n) {
   int x;
   int y;
-  for (y = 0; y < n >> 1; y++) {
+  for (y = 0; y < n > > 1; y++) {
     int vswap;
     vswap = y & 1;
-    for (x = 0; x < n >> 1; x++) {
+    for (x = 0; x < n > > 1; x++) {
       od_coeff ll;
       od_coeff lh;
       od_coeff hl;

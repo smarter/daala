@@ -83,7 +83,9 @@ typedef enum {
  */
 
 typedef int (*od_logger_function)(od_log_facility facility,
- od_log_level level, unsigned int flags, const char *fmt, va_list ap);
+ od_log_level level,
+ unsigned int flags,
+ const char *fmt, va_list ap);
 # define OD_LOG_FLAG_PARTIAL  1
 
 int od_log_init(od_logger_function logger);
@@ -114,14 +116,14 @@ int od_log_init(od_logger_function logger);
 int od_log(od_log_facility fac, od_log_level level,
  const char *fmt, ...)
 # ifdef __GNUC__
- __attribute__((format(printf, 3, 4)))
+__attribute__((format(printf, 3, 4)))
 # endif
 ;
 
 int od_log_partial(od_log_facility fac, od_log_level level,
  const char *fmt, ...)
 # ifdef __GNUC__
- __attribute__((format(printf, 3, 4)))
+__attribute__((format(printf, 3, 4)))
 # endif
 ;
 
@@ -135,13 +137,13 @@ int od_logging_active_impl(od_log_facility fac, od_log_level level);
    N == the name of the function
 
  */
-#define DECLARE_OD_LOG_MATRIX(T, N) \
-  int od_log_matrix_##N(od_log_facility facility, \
-                        od_log_level level, \
-                        const char *prefix, \
-                        T *values, \
-                        int width, \
-                        int height);
+# define DECLARE_OD_LOG_MATRIX(T, N) \
+  int od_log_matrix_ ## N(od_log_facility facility, \
+  od_log_level level, \
+  const char *prefix, \
+  T *values, \
+  int width, \
+  int height);
 
 
 DECLARE_OD_LOG_MATRIX(char, char)

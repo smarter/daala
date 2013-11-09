@@ -156,7 +156,8 @@ static void od_img_plane_copy_pad8(od_img_plane *dst_p,
     dst = dst_data;
     for (y = 0; y < pic_height; y++) {
       if (sxstride == 1) memcpy(dst, src_data, pic_width);
-      else for (x = 0; x < pic_width; x++) dst[x] = *(src_data + sxstride*x);
+      else
+        for (x = 0; x < pic_width; x++) dst[x] = *(src_data + sxstride*x);
       dst += dstride;
       src_data += systride;
     }
@@ -260,11 +261,11 @@ void od_band_encode(od_ec_enc *ec, int qg, int theta, int max_theta,
   generic_encode(ec, model, qg, exg, 2);
   if (theta >= 0 && max_theta > 0)
     generic_encode(ec, model, theta, ext, 2);
-  pvq_encoder(ec, y, n - (theta >= 0), k, adapt_curr, adapt);
+  pvq_encoder(ec, y, n-(theta >= 0), k, adapt_curr, adapt);
   if (adapt_curr[OD_ADAPT_K_Q8] > 0) {
-    adapt[OD_ADAPT_K_Q8] += 256*adapt_curr[OD_ADAPT_K_Q8] -
+    adapt[OD_ADAPT_K_Q8] += 256*adapt_curr[OD_ADAPT_K_Q8]-
      adapt[OD_ADAPT_K_Q8]>>speed;
-    adapt[OD_ADAPT_SUM_EX_Q8] += adapt_curr[OD_ADAPT_SUM_EX_Q8] -
+    adapt[OD_ADAPT_SUM_EX_Q8] += adapt_curr[OD_ADAPT_SUM_EX_Q8]-
      adapt[OD_ADAPT_SUM_EX_Q8]>>speed;
   }
   if (adapt_curr[OD_ADAPT_COUNT_Q8] > 0) {
@@ -511,8 +512,7 @@ void od_single_band_encode(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int ln,
      8, k[2], model, adapt, exg, ext);
     od_band_encode(&enc->ec, qg[3], theta[3], max_theta[3], scalar_out+32,
      32, k[3], model, adapt, exg, ext);
-    for (zzi = 1; zzi < n2; zzi++)
-      scalar_out[zzi] = cblock[zzi];
+    for (zzi = 1; zzi < n2; zzi++) scalar_out[zzi] = cblock[zzi];
   }
   else {
     vk = 0;
@@ -702,7 +702,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     od_img_plane plane;
     int plane_width;
     int plane_height;
-    *&plane = *(img->planes + pli);
+    * &plane = *(img->planes + pli);
     plane_width = ((pic_width + (1 << plane.xdec) - 1) >> plane.xdec);
     plane_height = ((pic_height + (1 << plane.ydec) - 1) >>
      plane.ydec);
@@ -719,7 +719,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     od_img img;
     info = &enc->state.info;
     /*Modify the image offsets to include the padding.*/
-    *&img = *(enc->state.io_imgs+OD_FRAME_INPUT);
+    * &img = *(enc->state.io_imgs+OD_FRAME_INPUT);
     for (pli = 0; pli < nplanes; pli++) {
       img.planes[pli].data -= (OD_UMV_PADDING>>info->plane_info[pli].xdec)
        +img.planes[pli].ystride*(OD_UMV_PADDING>>info->plane_info[pli].ydec);
@@ -775,7 +775,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
       outside the frame, but otherwise isn't read from.*/
     for (pli = 0; pli < nplanes; pli++) {
       od_img_plane plane;
-      *&plane = *(enc->state.io_imgs[OD_FRAME_REC].planes + pli);
+      * &plane = *(enc->state.io_imgs[OD_FRAME_REC].planes + pli);
       od_img_plane_edge_ext8(&plane, frame_width >> plane.xdec,
        frame_height >> plane.ydec, OD_UMV_PADDING >> plane.xdec,
        OD_UMV_PADDING >> plane.ydec);
@@ -793,8 +793,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
      eventually store them in bsize. */
   bs = _ogg_malloc(sizeof(BlockSizeComp));
   od_log_matrix_uchar(OD_LOG_GENERIC, OD_LOG_INFO, "bimg ",
-   enc->state.io_imgs[OD_FRAME_INPUT].planes[0].data -
-   16*enc->state.io_imgs[OD_FRAME_INPUT].planes[0].ystride - 16,
+   enc->state.io_imgs[OD_FRAME_INPUT].planes[0].data-16*
+   enc->state.io_imgs[OD_FRAME_INPUT].planes[0].ystride-16,
    enc->state.io_imgs[OD_FRAME_INPUT].planes[0].ystride, (nvsb + 1)*32);
 #if defined(OD_METRICS)
   bs_frac_bits = od_ec_enc_tell_frac(&enc->ec);
@@ -833,11 +833,11 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     }
   }
 #if defined(OD_METRICS)
-  enc->state.bit_metrics[OD_METRIC_BLOCK_SWITCHING] =
-   od_ec_enc_tell_frac(&enc->ec) - bs_frac_bits;
+  enc->state.bit_metrics[OD_METRIC_BLOCK_SWITCHING] = od_ec_enc_tell_frac(
+   &enc->ec) - bs_frac_bits;
 #endif
   od_log_matrix_uchar(OD_LOG_GENERIC, OD_LOG_INFO, "bsize ", enc->state.bsize,
-   enc->state.bstride, (nvsb + 1)*4);
+   enc->state.bstride, (nvsb+1)*4);
   for (i = 0; i < nvsb*4; i++) {
     for (j = 0; j < nhsb*4; j++) {
       OD_LOG_PARTIAL((OD_LOG_GENERIC, OD_LOG_INFO, "%d ",
@@ -940,8 +940,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
       }
     }
 #if defined(OD_METRICS)
-    enc->state.bit_metrics[OD_METRIC_MV] =
-     od_ec_enc_tell_frac(&enc->ec) - mv_frac_bits;
+    enc->state.bit_metrics[OD_METRIC_MV] = od_ec_enc_tell_frac(&enc->ec) -
+     mv_frac_bits;
 #endif
   }
   {
@@ -1027,9 +1027,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
         ystride = enc->state.io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
         for (y = 0; y < h; y++) {
           for (x = 0; x < w; x++) {
-            ctmp[pli][y*w + x] = data[ystride*y + x] - 128;
+            ctmp[pli][y*w+x] = data[ystride*y+x]-128;
             if (!mbctx.is_keyframe) {
-              mctmp[pli][y*w + x] = mdata[ystride*y + x] - 128;
+              mctmp[pli][y*w+x] = mdata[ystride*y+x]-128;
             }
           }
         }
@@ -1119,7 +1119,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
         ystride = enc->state.io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
         for (y = 0; y < h; y++) {
           for (x = 0; x < w; x++) {
-            data[ystride*y + x] = OD_CLAMP255(ctmp[pli][y*w + x] + 128);
+            data[ystride*y+x] = OD_CLAMP255(ctmp[pli][y*w+x]+128);
           }
         }
       }
@@ -1173,8 +1173,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     }
     OD_LOG((OD_LOG_ENCODER, OD_LOG_DEBUG,
      "Encoded Plane %i, Squared Error: %12lli  Pixels: %6u  PSNR:  %5.4f",
-     pli, (long long)enc_sqerr, npixels,
-     10*log10(255*255.0*npixels/enc_sqerr)));
+     pli, (long long)enc_sqerr, npixels, 10*
+     log10(255*255.0*npixels/enc_sqerr)));
   }
 #endif
   OD_LOG((OD_LOG_ENCODER, OD_LOG_INFO,
@@ -1191,8 +1191,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
 #if defined(OD_METRICS)
-  enc->state.bit_metrics[OD_METRIC_TOTAL] =
-   od_ec_enc_tell_frac(&enc->ec) - tot_frac_bits;
+  enc->state.bit_metrics[OD_METRIC_TOTAL] = od_ec_enc_tell_frac(&enc->ec) -
+   tot_frac_bits;
   write_metrics(enc->state.cur_time, &enc->state.bit_metrics[0]);
 #endif
   return 0;

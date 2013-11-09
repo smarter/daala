@@ -640,7 +640,7 @@ int od_state_dump_yuv(od_state *state, od_img *img, const char *suf) {
     xdec = img->planes[pli].xdec;
     ydec = img->planes[pli].ydec;
     ystride = img->planes[pli].ystride;
-    for (y = 0; y < (pic_height + ydec) >> ydec; y++) {
+    for (y = 0; y < (pic_height + ydec) > > ydec; y++) {
       if (fwrite(img->planes[pli].data + ystride*y,
        (pic_width + xdec) >> xdec, 1, fp) < 1) {
         fprintf(stderr, "Error writing to \"%s\".\n", fname);
@@ -660,21 +660,21 @@ int od_state_dump_yuv(od_state *state, od_img *img, const char *suf) {
   None of this is particularly fast.*/
 
 /*static const unsigned char OD_YCbCr_BORDER[3] = {49, 109, 184};*/
-static const unsigned char OD_YCbCr_BORDER[3] = {113, 72, 137};
-static const unsigned char OD_YCbCr_BEDGE[3] = {41, 240, 110};
-static const unsigned char OD_YCbCr_VEDGE[3] = {145, 54, 34};
-static const unsigned char OD_YCbCr_MV[3] = {81, 90, 240};
+static const unsigned char OD_YCbCr_BORDER[3] = { 113, 72, 137 };
+static const unsigned char OD_YCbCr_BEDGE[3] = { 41, 240, 110 };
+static const unsigned char OD_YCbCr_VEDGE[3] = { 145, 54, 34 };
+static const unsigned char OD_YCbCr_MV[3] = { 81, 90, 240 };
 
 void od_img_draw_point(od_img *img, int x, int y,
  const unsigned char ycbcr[3]) {
   if (x < 0 || y < 0 || x >= img->width || y >= img->height) return;
   *(img->planes[0].data + img->planes[0].ystride*(y >> img->planes[0].ydec)
-   + (x >> img->planes[0].xdec)) = ycbcr[0];
+  + (x >> img->planes[0].xdec)) = ycbcr[0];
   if (img->nplanes >= 3) {
     *(img->planes[1].data + img->planes[1].ystride*(y >> img->planes[1].ydec)
-     + (x >> img->planes[1].xdec)) = ycbcr[1];
+    + (x >> img->planes[1].xdec)) = ycbcr[1];
     *(img->planes[2].data + img->planes[2].ystride*(y >> img->planes[2].ydec)
-     + (x >> img->planes[2].xdec)) = ycbcr[2];
+    + (x >> img->planes[2].xdec)) = ycbcr[2];
   }
 }
 
@@ -958,12 +958,12 @@ void od_state_fill_vis(od_state *state) {
     memset(img->planes[0].data + (img->planes[0].ystride)*y,
      0, img->width >> xdec);
   }
-  for (; y < (img->height - border) >> ydec; y++) {
+  for (; y < (img->height - border) > > ydec; y++) {
     memset(img->planes[0].data + img->planes[0].ystride*y, 0, border >> xdec);
     memset(img->planes[0].data + img->planes[0].ystride*y
      + ((img->width - border) >> xdec), 0, border >> xdec);
   }
-  for (; y < img->height >> ydec; y++) {
+  for (; y < img->height > > ydec; y++) {
     memset(img->planes[0].data + (img->planes[0].ystride)*y, 0,
      img->width >> xdec);
   }

@@ -66,10 +66,9 @@ const band_layout od_layout4 = {
 
 /* Table of combined "use prediction" pvq flags for 8x8 trained on
    subset1. Should eventually make this adaptive. */
-const ogg_uint16_t pred8_cdf[16] = {
-  22313, 22461, 22993, 23050, 23418, 23468, 23553, 23617,
-  29873, 30181, 31285, 31409, 32380, 32525, 32701, 32768
-};
+const ogg_uint16_t pred8_cdf[16] =
+{ 22313, 22461, 22993, 23050, 23418, 23468, 23553, 23617,
+  29873, 30181, 31285, 31409, 32380, 32525, 32701, 32768 };
 
 void od_bands_from_raster(const band_layout *layout, od_coeff *dst,
  od_coeff *src, int stride) {
@@ -207,9 +206,8 @@ static double pvq_search_double(const double *x, int n, int k, int *y) {
     yy = yy + 2*y[pos] + 1;
     y[pos]++;
   }
-  for (i = 0; i < n; i++) {
+  for (i = 0; i < n; i++)
     if (x[i] < 0) y[i] = -y[i];
-  }
   return xy/(1e-100 + sqrt(xx*yy));
 }
 
@@ -315,9 +313,9 @@ void pvq_synthesis(od_coeff *x0, int *y, const double *r, int n, int noref,
     }
     norm = sqrt(1./(1e-100 + yy));
     for (i = 0; i < n; i++) {
-      x[i] = y[i]*norm*sin(theta);
+      x[i] = y[i] *norm *sin(theta);
     }
-    x[m] = -s*cos(theta);
+    x[m] = -s *cos(theta);
     inverse_householder(x, r, n);
   }
   g = q*pow(qcg, 1./ACTIVITY);
@@ -489,9 +487,8 @@ int pvq_theta(od_coeff *x0, od_coeff *r0, int n, int q0, int *y, int *itheta,
   /* Synthesize like the decoder would. */
   pvq_synthesis(x0, y, r, n, noref, qg, gain_offset, theta, m, s, q);
   /* Remove dimension m if we're using theta. */
-  if (!noref) {
+  if (!noref)
     for (i = m; i < n - 1; i++) y[i] = y[i+1];
-  }
   *vk = k;
   /* Encode gain differently depending on whether we use prediction or not. */
   return noref ? qg : neg_interleave(qg, icgr);
@@ -509,8 +506,8 @@ static int compare(const RDOEntry *a, const RDOEntry *b) {
 #endif
 
 #if 0
-# define SWAP(x, a, b) \
-  do { RDOEntry tmp = x[b]; x[b] = x[a]; x[a] = tmp; } while (0);
+# define SWAP(x, a, b) do { RDOEntry tmp = x[b]; x[b] = x[a]; x[a] = tmp; } \
+  while (0);
 static void find_nbest(RDOEntry *x, int n, int len) {
   int begin, end;
   begin = 0;
@@ -543,6 +540,7 @@ static void find_nbest(RDOEntry *x, int n, int len) {
       break;
     }
   }
+  ;
 }
 #endif
 
@@ -564,7 +562,7 @@ static void pvq_search_rdo(int *x, float *scale, float *scale_1, float g,
   float xn[MAXN];
   RDOEntry rd[MAXN];
   /* Some simple RDO constants that should eventually depend on the state of
-      the pvq encoders */
+    the pvq encoders */
   const float rate_ym = .3; /* Cost advantage of y[m] compared to y[0] */
   const float rate_lin = .1; /* Cost penalty of y[n+1] compared to y[n] */
   /* Apply inverse scaling */
@@ -621,7 +619,7 @@ static void pvq_search_rdo(int *x, float *scale, float *scale_1, float g,
   }
 #endif
   /* Find the remaining pulses "the long way" by minimizing the RDO cost
-      function */
+    function */
   for (i = 0; i < left; i++) {
     int   best_id;
     float best_cost; /* cost has reversed sign */
@@ -730,7 +728,7 @@ static void pvq_search(float *x, float *scale, float *scale_1, float g, int N,
       /* Trick to avoid having to divide by the denominators */
       if (tmp_xy*best_den > best_num*tmp_yy) {
         /*if (tmp_xy/sqrt(xx*tmp_yy)+best_cost >
-           best_num/sqrt(xx*best_den)+cost) {*/
+          best_num/sqrt(xx*best_den)+cost){*/
         best_num = tmp_xy;
         best_den = tmp_yy;
         best_id = j;
@@ -790,12 +788,13 @@ int od_gain_expander(int x) {
   ogg_int16_t xn;
   int ilog2x;
   /*const int C[3] = {2236, 25953, 18092};*/
-  const int C[3] = {2243, 25982, 18059};
+  const int C[3] = { 2243, 25982, 18059 };
   /* Generated using:
      printf("%d, ", round(32768*(2.^([0:15]-3).^(4/3))));printf("\n"); */
   static const int expand_table[19] = {
-   128, 323, 813, 2048, 5161, 13004, 32768, 82570, 208064, 524288, 1321123, 3329021,
-   8388608, 21137968, 53264341, 134217728, 338207482, 852229450, 2147483647
+    128, 323, 813, 2048, 5161, 13004, 32768, 82570, 208064, 524288, 1321123,
+    3329021,
+    8388608, 21137968, 53264341, 134217728, 338207482, 852229450, 2147483647
   };
   if (x == 0) return 0;
   ilog2x = OD_ILOG(x);
@@ -861,7 +860,8 @@ void pvq_synth(od_coeff *x, int *xn, od_coeff *r, int l2r, int cg,
 
 #if 0 /* Disabled until it gets integerized */
 int quant_pvq_theta(ogg_int32_t *x0, const ogg_int32_t *r0,
- ogg_int16_t *scale0, int *y, int n, int q0, int *qg, int shift, int intra) {
+ ogg_int16_t *scale0,
+ int *y, int n, int q0, int *qg, int shift, int intra) {
 /*(ogg_int32_t *_x,const ogg_int32_t *_r,
     ogg_int16_t *_scale,int *y,int N,int _Q, int *qg)*/
   int l2x;
@@ -927,9 +927,11 @@ int quant_pvq_theta(ogg_int32_t *x0, const ogg_int32_t *r0,
   cgq = cgr+CSCALE**qg;
   if (cgq < 1e-15) cgq = 1e-15;
   /* Cost difference between rounding up or down */
-  if (2*CSCALE_1*(cgq - cg) + 1 +
-   (lambda/(q*q*CSCALE_1*CSCALE_1))*
-   (2. + (n-1)*log2(1+(float)CSCALE/(cgq))) < 0) {
+  if (2*CSCALE_1*
+   (cgq-
+   cg)+1 +
+   (lambda/(q*q*CSCALE_1*CSCALE_1))*(2. + (n-1)*log2(1+(float)CSCALE/(cgq)))  <
+   0) {
     (*qg)++;
     cgq = cgr+CSCALE**qg;
   }
@@ -987,7 +989,7 @@ int quant_pvq_theta(ogg_int32_t *x0, const ogg_int32_t *r0,
 # if 1
     lambda = 1./(CSCALE_1*CSCALE_1*cg*cg);
     beta = 2*sin(theta)*sin(theta)-lambda;
-    if (beta <= 0 /*|| theta < .5*M_PI/qg*/) {
+    if (beta <= 0 /*|| theta<.5*M_PI/qg*/) {
       theta = 0;
     }
     else {
@@ -1034,8 +1036,8 @@ int quant_pvq_theta(ogg_int32_t *x0, const ogg_int32_t *r0,
 # else
   {
     x[m] = 0;
-    pvq_search_rdo(x, NULL, NULL, 1, n, k, y, m,
-     .0*lambda/(CSCALE_1*CSCALE_1*cg*cg));
+    pvq_search_rdo(x, NULL, NULL, 1, n, k, y, m, .0*lambda/
+     (CSCALE_1*CSCALE_1*cg*cg));
     {
       float sum = 1e-15;
       for (i = 0; i < n; i++) sum += y[i]*y[i];
@@ -1069,12 +1071,12 @@ int quant_pvq_theta(ogg_int32_t *x0, const ogg_int32_t *r0,
   }
   L2x = 0;
   for (i = 0; i < n; i++) {
-    float tmp = xn[i] /* * scale[i]*/;
+    float tmp = xn[i] /* *scale[i]*/;
     L2x += tmp*tmp;
   }
   g /= EPSILON+32768*sqrt(L2x);
   for (i = 0; i < n; i++) {
-    xn[i] *= g /* * scale[i]*/;
+    xn[i] *= g /* *scale[i]*/;
   }
   for (i = 0; i < n; i++) {
     x0[i] = floor(.5+xn[i]*(1./(1<<shift)));
@@ -1229,8 +1231,8 @@ int quant_pvq(ogg_int32_t *x0, const ogg_int32_t *r0, ogg_int16_t *scale0,
   OD_LOG((OD_LOG_PVQ, OD_LOG_DEBUG, "%d %d", k, n));
   /* Normalize lambda for quantizing on the unit circle */
   /* FIXME: See if we can avoid setting lambda to zero! */
-  pvq_search_rdo(x, NULL, NULL, 1, n, k, y, m,
-   .0*lambda*CSCALE*CSCALE/(cg*cg));
+  pvq_search_rdo(x, NULL, NULL, 1, n, k, y, m, .0*lambda*CSCALE*CSCALE/
+   (cg*cg));
   OD_LOG((OD_LOG_PVQ, OD_LOG_DEBUG, "%d ", k-abs(y[m])));
   for (i = 0; i < n; i++) {
     OD_LOG_PARTIAL((OD_LOG_PVQ, OD_LOG_DEBUG, "%d ", (m == i) ? 0 : y[i]));
@@ -1403,12 +1405,12 @@ int quant_pvq_noref(ogg_int32_t *_x, float gr,
 
   L2x = 0;
   for (i = 0; i < N; i++) {
-    float tmp = x[i] /* * scale[i]*/;
+    float tmp = x[i] /* *scale[i]*/;
     L2x += tmp*tmp;
   }
   g /= EPSILON+sqrt(L2x);
   for (i = 0; i < N; i++) {
-    x[i] *= g /* * scale[i]*/;
+    x[i] *= g /* *scale[i]*/;
   }
   for (i = 0; i < N; i++) {
     _x[i] = floor(.5+x[i]);

@@ -120,7 +120,7 @@ void od_fatal_impl(const char *_str, const char *_file, int _line) {
 
 int od_ilog(ogg_uint32_t _v) {
 #if defined(OD_CLZ)
-  return (OD_CLZ0-OD_CLZ(_v))&-!!_v;
+  return (OD_CLZ0-OD_CLZ(_v))& -!!_v;
 #else
   /*On a Pentium M, this branchless version tested as the fastest on
      1,000,000,000 random 32-bit integers, edging out a similar version with
@@ -162,8 +162,8 @@ void **od_malloc_2d(size_t _height, size_t _width, size_t _sz) {
     char *datptr;
     p = (void **)ret;
     i = _height;
-    for (datptr = ret + colsz; i-- > 0; p++, datptr += rowsz)
-      *p = (void *)datptr;
+    for (datptr = ret+colsz; i-- > 0; p++, datptr += rowsz) *p =
+       (void *)datptr;
   }
   return (void **)ret;
 }
@@ -177,7 +177,7 @@ void **od_calloc_2d(size_t _height, size_t _width, size_t _sz) {
   rowsz = _sz*_width;
   datsz = rowsz*_height;
   /*Alloc array and row pointers.*/
-  ret = (char *)_ogg_calloc(datsz + colsz, 1);
+  ret = (char *)_ogg_calloc(datsz+colsz, 1);
   /*Initialize the array.*/
   if (ret != NULL) {
     size_t   i;
@@ -185,8 +185,8 @@ void **od_calloc_2d(size_t _height, size_t _width, size_t _sz) {
     char *datptr;
     p = (void **)ret;
     i = _height;
-    for (datptr = ret + colsz; i-- > 0; p++, datptr += rowsz)
-      *p = (void *)datptr;
+    for (datptr = ret+colsz; i-- > 0; p++, datptr += rowsz) *p =
+       (void *)datptr;
   }
   return (void **)ret;
 }
@@ -207,14 +207,14 @@ void oggbyte_writeinit(oggbyte_buffer *_b) {
 
 void oggbyte_writetrunc(oggbyte_buffer *_b, ptrdiff_t _bytes) {
   OD_ASSERT(_bytes >= 0);
-  _b->ptr = _b->buf + _bytes;
+  _b->ptr = _b->buf+_bytes;
 }
 
 void oggbyte_write1(oggbyte_buffer *_b, unsigned _value) {
   ptrdiff_t endbyte;
   endbyte = _b->ptr-_b->buf;
   if (endbyte >= _b->storage) {
-    _b->buf = _ogg_realloc(_b->buf, _b->storage + BUFFER_INCREMENT);
+    _b->buf = _ogg_realloc(_b->buf, _b->storage+BUFFER_INCREMENT);
     _b->storage += BUFFER_INCREMENT;
     _b->ptr = _b->buf+endbyte;
   }
@@ -223,11 +223,11 @@ void oggbyte_write1(oggbyte_buffer *_b, unsigned _value) {
 
 void oggbyte_write4(oggbyte_buffer *_b, ogg_uint32_t _value) {
   ptrdiff_t endbyte;
-  endbyte = _b->ptr - _b->buf;
+  endbyte = _b->ptr-_b->buf;
   if (endbyte+4 > _b->storage) {
-    _b->buf = _ogg_realloc(_b->buf, _b->storage + BUFFER_INCREMENT);
+    _b->buf = _ogg_realloc(_b->buf, _b->storage+BUFFER_INCREMENT);
     _b->storage += BUFFER_INCREMENT;
-    _b->ptr = _b->buf + endbyte;
+    _b->ptr = _b->buf+endbyte;
   }
   *(_b->ptr++) = (unsigned char)_value;
   _value >>= 8;
@@ -270,7 +270,7 @@ void oggbyte_readinit(oggbyte_buffer *_b, unsigned char *_buf,
 
 int oggbyte_look1(oggbyte_buffer *_b) {
   ptrdiff_t endbyte;
-  endbyte = _b->ptr - _b->buf;
+  endbyte = _b->ptr-_b->buf;
   if (endbyte >= _b->storage) return -1;
   else return _b->ptr[0];
 }
@@ -374,6 +374,6 @@ int daala_packet_isheader(ogg_packet *_op) {
 }
 
 int daala_packet_iskeyframe(ogg_packet *_op) {
-  return _op->bytes <= 0 ? 0 : _op->packet[0]&0x80 ?
-   -1 : !(_op->packet[0]&0x40);
+  return _op->bytes <= 0 ? 0 : _op->packet[0]&
+   0x80 ? -1 : !(_op->packet[0]&0x40);
 }

@@ -584,8 +584,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
           mdata = dec->state.io_imgs[OD_FRAME_REC].planes[pli].data;
           ystride = dec->state.io_imgs[OD_FRAME_REC].planes[pli].ystride;
           for (y = 0; y < h; y++) {
-            for (x = 0; x < w; x++)
-              mctmp[pli][y*w + x] = mdata[ystride*y + x] - 128;
+            for (x = 0; x < w; x++) mctmp[pli][y*w+x] = mdata[ystride*y+x]-128;
           }
         }
         /*Apply the prefilter across the entire image.*/
@@ -710,7 +709,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
         ystride = dec->state.io_imgs[OD_FRAME_REC].planes[pli].ystride;
         for (y = 0; y < h; y++) {
           for (x = 0; x < w; x++) {
-            data[ystride*y + x] = OD_CLAMP255(ctmp[pli][y*w + x] + 128);
+            data[ystride*y+x] = OD_CLAMP255(ctmp[pli][y*w+x]+128);
           }
         }
       }

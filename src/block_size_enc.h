@@ -33,9 +33,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # define OFF16 (2)
 # define OFF32 (3)
 
-# define COUNT8  (3 + 2*OFF8)
-# define COUNT16 (7 + 2*OFF16)
-# define COUNT32 (15 + 2*OFF32)
+# define COUNT8  (3+2*OFF8)
+# define COUNT16 (7+2*OFF16)
+# define COUNT32 (15+2*OFF32)
 
 
 /* None of these values should be larger than OFF32/2 of else the universe will
@@ -43,15 +43,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # define OFF8_16 (1)
 # define OFF8_32 (1)
 
-# define COUNT8_16  (3 + 2*OFF8_16)
-# define COUNT8_32  (7 + 2*OFF8_32)
+# define COUNT8_16  (3+2*OFF8_16)
+# define COUNT8_32  (7+2*OFF8_32)
 
-# define SIZE2_SUMS (16 + 2*OFF32)
-# define SIZE4_SUMS (15 + 2*OFF32)
-# define SIZE8_SUMS (7 + 2*OFF8_32)
+# define SIZE2_SUMS (16+2*OFF32)
+# define SIZE4_SUMS (15+2*OFF32)
+# define SIZE8_SUMS (7+2*OFF8_32)
 
 /*#define STRIDE (32+4*OFF32)*/
-# define BLOCK_OFFSET(stride) ((2*OFF32)*(stride) + (2*OFF32))
+# define BLOCK_OFFSET(stride) ((2*OFF32)*(stride)+(2*OFF32))
 
 /* This struct can be made a lot smaller by using temporary values,
    but as it is, it's much easier to debug and modify */

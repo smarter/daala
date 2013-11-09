@@ -165,9 +165,8 @@ int daala_decode_header_in(daala_info *info,
       if (oggbyte_read4(&obb, &info->pixel_aspect_denominator)) {
         return OD_EBADHEADER;
       }
-      if (oggbyte_read4(&obb, &info->timebase_numerator)) {
+      if (oggbyte_read4(&obb, &info->timebase_numerator))
         return OD_EBADHEADER;
-      }
       if (oggbyte_read4(&obb, &info->timebase_denominator)) {
         return OD_EBADHEADER;
       }

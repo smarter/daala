@@ -39,7 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #define CG32 (17.1/6)
 
 /* Tuning parameter for block decision (higher values results in smaller
-    blocks) */
+  blocks) */
 #define PSY_LAMBDA (.65)
 
 /* Weighting of the 8x8 masking compared to 4x4 */
@@ -56,16 +56,16 @@ static void od_compute_stats(const unsigned char *img, int stride,
   int i;
   int j;
   int off8;
-  ogg_int32_t (*Sx2)[SIZE2_SUMS];
-  ogg_int32_t (*Sxx2)[SIZE2_SUMS];
-  ogg_int32_t (*Sx4)[SIZE4_SUMS];
-  ogg_int32_t (*Sxx4)[SIZE4_SUMS];
-  ogg_int32_t (*Sx8)[SIZE8_SUMS];
-  ogg_int32_t (*Sxx8)[SIZE8_SUMS];
-  ogg_int32_t (*Var4)[SIZE4_SUMS];
-  ogg_int32_t (*invVar4)[SIZE4_SUMS];
-  ogg_int32_t (*Var8)[SIZE8_SUMS];
-  ogg_int32_t (*invVar8)[SIZE8_SUMS];
+  ogg_int32_t(*Sx2)[SIZE2_SUMS];
+  ogg_int32_t(*Sxx2)[SIZE2_SUMS];
+  ogg_int32_t(*Sx4)[SIZE4_SUMS];
+  ogg_int32_t(*Sxx4)[SIZE4_SUMS];
+  ogg_int32_t(*Sx8)[SIZE8_SUMS];
+  ogg_int32_t(*Sxx8)[SIZE8_SUMS];
+  ogg_int32_t(*Var4)[SIZE4_SUMS];
+  ogg_int32_t(*invVar4)[SIZE4_SUMS];
+  ogg_int32_t(*Var8)[SIZE8_SUMS];
+  ogg_int32_t(*invVar8)[SIZE8_SUMS];
 
   Sx2 = stats->Sx2;
   Sxx2 = stats->Sxx2;
@@ -101,8 +101,10 @@ static void od_compute_stats(const unsigned char *img, int stride,
     for (j = 0; j < SIZE8_SUMS; j++) {
       Sx8[i][j] = Sx4[2*i + off8][2*j+off8] + Sx4[2*i + off8][2*j + 2 + off8]
        + Sx4[2*i + 2 + off8][2*j + off8] + Sx4[2*i + 2 + off8][2*j + 2 + off8];
-      Sxx8[i][j] = Sxx4[2*i + off8][2*j + off8] + Sxx4[2*i + off8][2*j + 2 + off8]
-       + Sxx4[2*i + 2 + off8][2*j + off8] + Sxx4[2*i + 2 + off8][2*j + 2 + off8];
+      Sxx8[i][j] =
+       Sxx4[2*i + off8][2*j + off8] + Sxx4[2*i + off8][2*j + 2 + off8]
+       + Sxx4[2*i + 2 + off8][2*j +
+       off8] + Sxx4[2*i + 2 + off8][2*j + 2 + off8];
     }
   }
   for (i = 0; i < SIZE4_SUMS; i++) {
@@ -267,7 +269,7 @@ void process_block_size32(BlockSizeComp *bs, const unsigned char *psy_img,
       gain16 = CG16 - PSY_LAMBDA*(bs->psy16[i][j]);
       if (gain16 >= gain8_avg) {
         bsize[2*i][2*j] = bsize[2*i][2*j + 1]
-         = bsize[2*i + 1][2*j] = bsize[2*i + 1][2*j + 1] = 2;
+           = bsize[2*i + 1][2*j] = bsize[2*i + 1][2*j + 1] = 2;
         bs->dec_gain16[i][j] = gain16;
       }
       else {
