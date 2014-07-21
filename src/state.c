@@ -311,9 +311,79 @@ void od_adapt_ctx_reset(od_adapt_ctx *state, int is_keyframe) {
   memcpy(state->mode_probs, OD_INTRA_PRED_PROB_4x4, 3*OD_INTRA_NMODES*OD_INTRA_NCONTEXTS);
 }
 
-#if 0
+#if OD_UPSAMPLER == OD_UPSAMPLER_EDI_HV || OD_UPSAMPLER == OD_UPSAMPLER_EDI_VH
+static int reconstruct_v(const unsigned char *src, int xstride, int ystride,
+ int a, int b, int c, int d)
+{
+  int x;
+
+  x = src[0 - 3 * ystride] * a;
+  x += src[0 - 2 * ystride] * b;
+  x += src[0 - 1 * ystride] * c;
+  x += src[0 - 0 * ystride] * d;
+  x += src[1*xstride + 0*ystride] * d;
+  x += src[1*xstride + 1*ystride] * c;
+  x += src[1*xstride + 2*ystride] * b;
+  x += src[1*xstride + 3*ystride] * a;
+  return (x + 16) >> 5;
+}
+
+static int reconstruct_h(const unsigned char *d1, const unsigned char *d2,
+ int a, int b, int c, int d)
+{
+  int x;
+
+  x = d1[-3] * a;
+  x += d1[-2] * b;
+  x += d1[-1] * c;
+  x += d1[-0] * d;
+  x += d2[0] * d;
+  x += d2[1] * c;
+  x += d2[2] * b;
+  x += d2[3] * a;
+  return (x + 16) >> 5;
+}
+
+static int sinc_filter(const unsigned char *s, int stride) {
+  return 20*s[0] - 5*s[1*stride] + s[2*stride];
+}
+
+static int reconstruct_v2(const unsigned char *s, int xstride, int ystride,
+ int a, int b, int c, int d)
+{
+  int x;
+
+  x = sinc_filter(s + 0 - 3 * ystride, -xstride) * a;
+  x += sinc_filter(s + 0 - 2 * ystride, -xstride) * b;
+  x += sinc_filter(s + 0 - 1 * ystride, -xstride) * c;
+  x += sinc_filter(s + 0 - 0 * ystride, -xstride) * d;
+  x += sinc_filter(s + 1*xstride + 0 * ystride, xstride) * d;
+  x += sinc_filter(s + 1*xstride + 1 * ystride, xstride) * c;
+  x += sinc_filter(s + 1*xstride + 2 * ystride, xstride) * b;
+  x += sinc_filter(s + 1*xstride + 3 * ystride, xstride) * a;
+  return (x + 16*16) >> (5+4);
+}
+
+static int reconstruct_h2(const unsigned char *s, int xstride, int ystride,
+ int a, int b, int c, int d)
+{
+  int x;
+
+  x = sinc_filter(s - 3*xstride, -ystride) * a;
+  x += sinc_filter(s - 2*xstride, -ystride) * b;
+  x += sinc_filter(s - 1*xstride, -ystride) * c;
+  x += sinc_filter(s - 0*xstride, -ystride) * d;
+  x += sinc_filter(s + ystride + 0*xstride, ystride) * d;
+  x += sinc_filter(s + ystride + 1*xstride, ystride) * c;
+  x += sinc_filter(s + ystride + 2*xstride, ystride) * b;
+  x += sinc_filter(s + ystride + 3*xstride, ystride) * a;
+  return (x + 16*16) >> (5+4);
+}
+#endif
+
 /*Upsamples the reconstructed image to a reference image.
   TODO: Pipeline with reconstruction.*/
+#if OD_UPSAMPLER == OD_UPSAMPLER_CUBIC
 void od_state_upsample8(od_state *state, int refi) {
   int pli;
   for (pli = 0; pli < state->io_imgs[OD_FRAME_REC].nplanes; pli++) {
@@ -427,9 +497,7 @@ void od_state_upsample8(od_state *state, int refi) {
     }
   }
 }
-#else
-/*Upsamples the reconstructed image to a reference image.
-  TODO: Pipeline with reconstruction.*/
+#elif OD_UPSAMPLER == OD_UPSAMPLER_SINC
 void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
   int pli;
   for (pli = 0; pli < state->io_imgs[OD_FRAME_REC].nplanes; pli++) {
@@ -552,6 +620,686 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
     }
   }
 }
+#elif OD_UPSAMPLER == OD_UPSAMPLER_EDI_HV
+/* Things to figure out:
+   - Chroma handling.
+   - Padding extrapolation.*/
+void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
+  int pli;
+  for (pli = 0; pli < 1; pli++) {
+    const od_img_plane *siplane;
+    od_img_plane *diplane;
+    int src_stride, dst_stride;
+    const unsigned char *src;
+    unsigned char *dst;
+    const unsigned char *s;
+    unsigned char *d;
+    int xpad;
+    int ypad;
+    int w;
+    int h;
+    int x;
+    int y;
+    const int MARGIN = 3;
+
+    siplane = simg->planes + pli;
+    diplane = dimg->planes + pli;
+    src_stride = siplane->ystride;
+    dst_stride = diplane->ystride;
+    xpad = OD_UMV_PADDING >> siplane->xdec;
+    ypad = OD_UMV_PADDING >> siplane->ydec;
+    w = simg->width >> siplane->xdec;
+    h = simg->height >> siplane->ydec;
+    src = siplane->data;
+    dst = diplane->data;
+    s = src;
+    d = dst - dst_stride*(2*ypad);
+
+    /* Padding, margin and source pixels copy */
+    for (y = -ypad; y < h + ypad; y++) {
+      memset(d - 2*xpad, s[0], 2*xpad);
+      if (y < MARGIN || y >= h - MARGIN - 1) {
+        d[0] = s[0];
+        d[1] = (20*(s[0] + s[1]) - 5*(s[0] + s[2]) + s[0] + s[3] + 16) >> 5;
+        d[2] = s[1];
+        d[3] = (20*(s[1] + s[2]) - 5*(s[0] + s[3]) + s[0] + s[4] + 16) >> 5;
+        for (x = 2; x < w - 3; x++) {
+          d[2*x] = s[x];
+          d[2*x + 1] = (20*(s[x] + s[x + 1])
+           - 5*(s[x - 1] + s[x + 2]) + s[x - 2] + s[x + 3] + 16) >> 5;
+        }
+        d[2*x] = s[x];
+        d[2*x + 1] = (20*(s[x] + s[x + 1])
+         - 5*(s[x - 1] + s[x + 2]) + s[x - 2] + s[x + 2] + 16) >> 5;
+        x++;
+        d[2*x] = s[x];
+        d[2*x + 1] = (20*(s[x] + s[x + 1])
+         - 5*(s[x - 1] + s[x + 1]) + s[x - 2] + s[x + 1] + 16) >> 5;
+        x++;
+        d[2*x] = s[x];
+        d[2*x + 1] = (36*s[x] - 5*s[x - 1] + s[x - 2] + 16) >> 5;
+        x++;
+      } else {
+        for (x = 0; x < w; x++) {
+          d[2*x] = s[x];
+        }
+      }
+      memset(d + 2*w, s[w - 1], 2*xpad);
+      if (y >= 0 && y < h - 1)
+        s += src_stride;
+      else
+        OD_COPY(d + dst_stride - 2*xpad, d - 2*xpad, 2*(w + 2*xpad));
+      d += 2*dst_stride;
+    }
+    /* Horizontal filtering */
+    d = dst + dst_stride*2*MARGIN;
+    for (y = MARGIN; y < h - MARGIN - 1; y++) {
+      for (x = 0; x < 2*w; x += 2) {
+        int dx, dy, dx2;
+        int v;
+
+        dx = -d[-2*dst_stride + x]
+             - d[-2*dst_stride + x + 2]
+             + d[2*dst_stride + x]
+             + d[2*dst_stride + x + 2];
+        dx *= 2;
+
+        dy = -d[-2*dst_stride + x]
+             - 2 * d[x]
+             - d[2*dst_stride + x]
+             + d[-2*dst_stride + x + 2]
+             + 2 * d[x + 2]
+             + d[2*dst_stride + x + 2];
+
+        dx2 = -d[-2*dst_stride + x]
+              + 2 * d[x]
+              - d[2*dst_stride + x]
+              - d[-2*dst_stride + x + 2]
+              + 2 * d[x + 2]
+              - d[2*dst_stride + x + 2];
+
+        if (dy < 0) {
+          dy = -dy;
+          dx = -dx;
+        }
+
+        if (abs(dx) <= 4 * abs(dx2)) {
+          v = (20*(d[x] + d[x + 2])
+               - 5*(d[x - 2] + d[x + 4]) + d[x - 4] + d[x + 6] + 16) >> 5;
+        } else if (dx < 0) {
+          if (dx < -2 * dy) {
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, 0, 0, 0, 16);
+          } else if (dx < -dy) {
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, 0, 0, 8, 8);
+          } else if (2 * dx < -dy) {
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, 0, 4, 8, 4);
+          } else if (3 * dx < -dy) {
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, 1, 7, 7, 1);
+          } else {
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, 4, 8, 4, 0);
+          }
+        } else {
+          if (dx > 2 * dy) {
+            v = reconstruct_v2(d + x, 2, -2*dst_stride, 0, 0, 0, 16);
+          } else if (dx > dy) {
+            v = reconstruct_v2(d + x, 2, -2*dst_stride, 0, 0, 8, 8);
+          } else if (2 * dx > dy) {
+            v = reconstruct_v2(d + x, 2, -2*dst_stride, 0, 4, 8, 4);
+          } else if (3 * dx > dy) {
+            v = reconstruct_v2(d + x, 2, -2*dst_stride, 1, 7, 7, 1);
+          } else {
+            v = reconstruct_v2(d + x, 2, -2*dst_stride, 4, 8, 4, 0);
+          }
+        }
+        d[x + 1] = OD_CLAMP255(v);
+      }
+      if (y >= 0 && y < h - 1)
+        s += src_stride;
+      d += 2*dst_stride;
+    }
+    /* Vertical filtering */
+    d = dst;
+    for (y = 0; y < h; y++) {
+      unsigned char *d1 = d;
+      unsigned char *d2 = d + dst_stride;
+      unsigned char *d3 = d + 2*dst_stride;
+      unsigned char *d5 = d + 4*dst_stride;
+      unsigned char *d7 = d + 6*dst_stride;
+      unsigned char *dm1 = d - 2*dst_stride;
+      unsigned char *dm3 = d - 4*dst_stride;
+
+      for (x = -2*xpad; x < 2*w + 2*xpad; x++) {
+        if (x >= MARGIN && x < 2*w - MARGIN - 1) {
+          int dx, dy;
+          int dx2;
+          int v;
+
+          dx = -d1[x - 1]
+              - d3[x - 1]
+              + d1[x + 1]
+              + d3[x + 1];
+          dx *= 2;
+
+          dy = -d1[x - 1]
+              - 2 * d1[x]
+              - d1[x + 1]
+              + d3[x - 1]
+              + 2 * d3[x]
+              + d3[x + 1];
+
+          dx2 = -d1[x - 1]
+              + 2 * d1[x]
+              - d1[x + 1]
+              - d3[x - 1]
+              + 2 * d3[x]
+              - d3[x + 1];
+
+          if (dy < 0) {
+            dy = -dy;
+            dx = -dx;
+          }
+
+          if (abs(dx) <= 4*abs(dx2)) {
+            v = (20*(d1[x] + d3[x])
+             - 5*(dm1[x] + d5[x]) + dm3[x] + d7[x] + 16) >> 5;
+          } else if (dx < 0) {
+            if (dx < -2 * dy) {
+              v = reconstruct_h2(d1 + x, 1, 2*dst_stride, 0, 0, 0, 16);
+            } else if (dx < -dy) {
+              v = reconstruct_h2(d1 + x, 1, 2*dst_stride, 0, 0, 8, 8);
+            } else if (2 * dx < -dy) {
+              v = reconstruct_h2(d1 + x, 1, 2*dst_stride, 0, 4, 8, 4);
+            } else if (3 * dx < -dy) {
+              v = reconstruct_h2(d1 + x, 1, 2*dst_stride, 1, 7, 7, 1);
+            } else {
+              v = reconstruct_h2(d1 + x, 1, 2*dst_stride, 4, 8, 4, 0);
+            }
+          } else {
+            if (dx > 2 * dy) {
+              v = reconstruct_h2(d3 + x, 1, -2*dst_stride, 0, 0, 0, 16);
+            } else if (dx > dy) {
+              v = reconstruct_h2(d3 + x, 1, -2*dst_stride, 0, 0, 8, 8);
+            } else if (2 * dx > dy) {
+              v = reconstruct_h2(d3 + x, 1, -2*dst_stride, 0, 4, 8, 4);
+            } else if (3 * dx > dy) {
+              v = reconstruct_h2(d3 + x, 1, -2*dst_stride, 1, 7, 7, 1);
+            } else {
+              v = reconstruct_h2(d3 + x, 1, -2*dst_stride, 4, 8, 4, 0);
+            }
+          }
+          d2[x] = OD_CLAMP255(v);
+        } else {
+          d2[x] = (20*(d1[x] + d3[x])
+           - 5*(dm1[x] + d5[x]) + dm3[x] + d7[x] + 16) >> 5;
+        }
+      }
+      d += 2*dst_stride;
+    }
+  }
+  for (pli = 1; pli < state->io_imgs[OD_FRAME_REC].nplanes; pli++) {
+    const od_img_plane *siplane;
+    od_img_plane *diplane;
+    const unsigned char *src;
+    unsigned char *dst;
+    int xpad;
+    int ypad;
+    int w;
+    int h;
+    int x;
+    int y;
+    siplane = simg->planes + pli;
+    diplane = dimg->planes + pli;
+    xpad = OD_UMV_PADDING >> siplane->xdec;
+    ypad = OD_UMV_PADDING >> siplane->ydec;
+    w = simg->width >> siplane->xdec;
+    h = simg->height >> siplane->ydec;
+    src = siplane->data;
+    dst = diplane->data - (diplane->ystride << 1)*ypad;
+    for (y = -ypad; y < h + ypad + 3; y++) {
+      /*Horizontal filtering:*/
+      if (y < h + ypad) {
+        unsigned char *buf;
+        buf = state->ref_line_buf[y & 7];
+        memset(buf - (xpad << 1), src[0], (xpad - 2) << 1);
+        /*for (x = -xpad; x < -2; x++) {
+          *(buf + (x << 1)) = src[0];
+          *(buf + (x << 1 | 1)) = src[0];
+        }*/
+        *(buf - 4) = src[0];
+        *(buf - 3) = OD_CLAMP255((31*src[0] + src[1] + 16) >> 5);
+        *(buf - 2) = src[0];
+        *(buf - 1) = OD_CLAMP255((36*src[0] - 5*src[1] + src[1] + 16) >> 5);
+        buf[0] = src[0];
+        buf[1] = OD_CLAMP255((20*(src[0] + src[1])
+         - 5*(src[0] + src[2]) + src[0] + src[3] + 16) >> 5);
+        buf[2] = src[1];
+        buf[3] = OD_CLAMP255((20*(src[1] + src[2])
+         - 5*(src[0] + src[3]) + src[0] + src[4] + 16) >> 5);
+        for (x = 2; x < w - 3; x++) {
+          buf[x << 1] = src[x];
+          buf[x << 1 | 1] = OD_CLAMP255((20*(src[x] + src[x + 1])
+           - 5*(src[x - 1] + src[x + 2]) + src[x - 2] + src[x + 3] + 16) >> 5);
+        }
+        buf[x << 1] = src[x];
+        buf[x << 1 | 1] = OD_CLAMP255((20*(src[x] + src[x + 1])
+         - 5*(src[x - 1] + src[x + 2]) + src[x - 2] + src[x + 2] + 16) >> 5);
+        x++;
+        buf[x << 1] = src[x];
+        buf[x << 1 | 1] = OD_CLAMP255((20*(src[x] + src[x + 1])
+         - 5*(src[x - 1] + src[x + 1]) + src[x - 2] + src[x + 1] + 16) >> 5);
+        x++;
+        buf[x << 1] = src[x];
+        buf[x << 1 | 1] =
+         OD_CLAMP255((36*src[x] - 5*src[x - 1] + src[x - 2] + 16) >> 5);
+        x++;
+        buf[x << 1] = src[w - 1];
+        buf[x << 1 | 1] = OD_CLAMP255((31*src[w - 1] + src[w - 2] + 16) >> 5);
+        memset(buf + (++x << 1), src[w - 1], (xpad - 1) << 1);
+        /*for (x++; x < w + xpad; x++) {
+          buf[x << 1] = src[w - 1];
+          buf[x << 1 | 1]=src[w - 1];
+        }*/
+        if (y >= 0 && y + 1 < h) src += siplane->ystride;
+      }
+      /*Vertical filtering:*/
+      if (y >= -ypad + 3) {
+        if (y < 1 || y > h + 3) {
+          OD_COPY(dst - (xpad << 1),
+           state->ref_line_buf[(y - 3) & 7] - (xpad << 1),
+           (w + (xpad << 1)) << 1);
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+          OD_COPY(dst - (xpad << 1),
+           state->ref_line_buf[(y - 3) & 7] - (xpad << 1),
+           (w + (xpad << 1)) << 1);
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1 | 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+        }
+        else {
+          unsigned char *buf[6];
+          buf[0] = state->ref_line_buf[(y - 5) & 7];
+          buf[1] = state->ref_line_buf[(y - 4) & 7];
+          buf[2] = state->ref_line_buf[(y - 3) & 7];
+          buf[3] = state->ref_line_buf[(y - 2) & 7];
+          buf[4] = state->ref_line_buf[(y - 1) & 7];
+          buf[5] = state->ref_line_buf[(y - 0) & 7];
+          OD_COPY(dst - (xpad << 1),
+           state->ref_line_buf[(y - 3) & 7] - (xpad << 1),
+           (w + (xpad << 1)) << 1);
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            *(dst + x) = OD_CLAMP255((20*(*(buf[2] + x) + *(buf[3] + x))
+             - 5*(*(buf[1] + x) + *(buf[4] + x))
+             + *(buf[0] + x) + *(buf[5] + x) + 16) >> 5);
+          }
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1 | 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+        }
+      }
+    }
+  }
+}
+#elif OD_UPSAMPLER == OD_UPSAMPLER_EDI_VH
+void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
+  int pli;
+  for (pli = 0; pli < 1; pli++) {
+    const od_img_plane *siplane;
+    od_img_plane *diplane;
+    int src_stride, dst_stride;
+    const unsigned char *src;
+    unsigned char *dst;
+    const unsigned char *s;
+    unsigned char *d;
+    int xpad;
+    int ypad;
+    int w;
+    int h;
+    int x;
+    int y;
+    const int MARGIN = 3;
+
+    siplane = simg->planes + pli;
+    diplane = dimg->planes + pli;
+    src_stride = siplane->ystride;
+    dst_stride = diplane->ystride;
+    xpad = OD_UMV_PADDING >> siplane->xdec;
+    ypad = OD_UMV_PADDING >> siplane->ydec;
+    w = simg->width >> siplane->xdec;
+    h = simg->height >> siplane->ydec;
+    src = siplane->data;
+    dst = diplane->data;
+    s = src;
+    d = dst;
+
+    /* Padding, margin and source pixels copy */
+    for (y = 0; y < h; y++) {
+      unsigned char *d1 = d;
+      unsigned char *d2 = d1 + dst_stride;
+
+      memset(d1 - 2*xpad, s[0], 2*xpad);
+      for (x = 0; x < w; x++)
+        d1[2*x] = s[x];
+      memset(d1 + 2*w, s[w - 1], 2*xpad);
+
+      if (y < h - 1) {
+        for (x = 0; x < MARGIN; x++)
+          d2[2*x] = (s[x] + s[src_stride + x] + 1) >> 1;
+        if (y < MARGIN || y >= h - MARGIN - 1)
+          for (x = MARGIN; x < w - MARGIN - 1; x++)
+            d2[2*x] = (s[x] + s[src_stride + x] + 1) >> 1;
+        for (x = w - MARGIN - 1; x < w; x++)
+          d2[2*x] = (s[x] + s[src_stride + x] + 1) >> 1;
+      } else {
+        for (x = 0; x < w; x++)
+          d2[2*x] = d1[2*x];
+      }
+
+      memset(d2 - 2*xpad, d2[0], 2*xpad);
+      memset(d2 + 2*w, d2[2*(w - 1)], 2*xpad);
+
+      s += src_stride;
+      d += 2*dst_stride;
+    }
+    {
+      unsigned char *dpad;
+      d = dst;
+      dpad = dst - dst_stride*2*ypad;
+      for (y = 0; y < 2*ypad; y++) {
+        OD_COPY(dpad - 2*xpad, d - 2*xpad, 2*(w + 2*xpad));
+        dpad += dst_stride;
+      }
+      d = dst + dst_stride*2*(h - 1);
+      dpad = d + dst_stride*2;
+      for (y = 0; y < 2*ypad; y++) {
+        OD_COPY(dpad - 2*xpad, d - 2*xpad, 2*(w + 2*xpad));
+        dpad += dst_stride;
+      }
+    }
+
+    /* Vertical filtering */
+    d = dst + dst_stride*2*MARGIN;
+    for (y = MARGIN; y < h - MARGIN - 1; y++) {
+      unsigned char *d1 = d;
+      unsigned char *d2 = d + dst_stride;
+      unsigned char *d3 = d + 2*dst_stride;
+      unsigned char *d5 = d + 4*dst_stride;
+      unsigned char *d7 = d + 6*dst_stride;
+      unsigned char *dm1 = d - 2*dst_stride;
+      unsigned char *dm3 = d - 4*dst_stride;
+
+      for (x = 2*MARGIN; x < 2*(w - MARGIN - 1); x += 2) {
+        int dx, dy, dx2;
+        int v;
+
+        dx = -d1[x - 2]
+          - d3[x - 2]
+          + d1[x + 2]
+          + d3[x + 2];
+        dx *= 2;
+        dy = -d1[x - 2]
+          - 2 * d1[x]
+          - d1[x + 2]
+          + d3[x - 2]
+          + 2 * d3[x]
+          + d3[x + 2];
+
+        dx2 = -d1[x - 2]
+          + 2 * d1[x]
+          - d1[x + 2]
+          - d3[x - 2]
+          + 2 * d3[x]
+          - d3[x + 2];
+
+        if (dy < 0) {
+          dy = -dy;
+          dx = -dx;
+        }
+
+        if (abs(dx) <= 4 * abs(dx2)) {
+          v = (20*(d1[x] + d3[x])
+           - 5*(dm1[x] + d5[x]) + dm3[x] + d7[x] + 16) >> 5;
+        } else if (dx < 0) {
+          if (dx < -2 * dy) {
+            v = reconstruct_h2(d1 + x, 2, 2*dst_stride, 0, 0, 0, 16);
+          } else if (dx < -dy) {
+            v = reconstruct_h2(d1 + x, 2, 2*dst_stride, 0, 0, 8, 8);
+          } else if (2 * dx < -dy) {
+            v = reconstruct_h2(d1 + x, 2, 2*dst_stride, 0, 4, 8, 4);
+          } else if (3 * dx < -dy) {
+            v = reconstruct_h2(d1 + x, 2, 2*dst_stride, 1, 7, 7, 1);
+          } else {
+            v = reconstruct_h2(d1 + x, 2, 2*dst_stride, 4, 8, 4, 0);
+          }
+        } else {
+          if (dx > 2 * dy) {
+            v = reconstruct_h2(d3 + x, 2, -2*dst_stride, 0, 0, 0, 16);
+          } else if (dx > dy) {
+            v = reconstruct_h2(d3 + x, 2, -2*dst_stride, 0, 0, 8, 8);
+          } else if (2 * dx > dy) {
+            v = reconstruct_h2(d3 + x, 2, -2*dst_stride, 0, 4, 8, 4);
+          } else if (3 * dx > dy) {
+            v = reconstruct_h2(d3 + x, 2, -2*dst_stride, 1, 7, 7, 1);
+          } else {
+            v = reconstruct_h2(d3 + x, 2, -2*dst_stride, 4, 8, 4, 0);
+          }
+        }
+        d2[x] = v;
+      }
+      d += 2*dst_stride;
+    }
+    /* Horizontal filtering */
+    d = dst - dst_stride*2*ypad;
+    for (y = -2*ypad; y < 2*(h + ypad); y++) {
+      if (y >= MARGIN && y < 2*h - MARGIN - 1) {
+        unsigned char *d1 = d - dst_stride;
+        unsigned char *d2 = d;
+        unsigned char *d3 = d + dst_stride;
+        for (x = 0; x < w; x++) {
+          int dx, dy;
+          int dx2;
+          int v;
+
+          dx = -d1[2*x]
+            - d1[2*x + 2]
+            + d3[2*x]
+            + d3[2*x + 2];
+          dx *= 2;
+
+          dy = -d1[2*x]
+            - 2 * d2[2*x]
+            - d3[2*x]
+            + d1[2*x + 2]
+            + 2 * d2[2*x + 2]
+            + d3[2*x + 2];
+
+          dx2 = -d1[2*x]
+            + 2 * d2[2*x]
+            - d3[2*x]
+            - d1[2*x + 2]
+            + 2 * d2[2*x + 2]
+            - d3[2*x + 2];
+
+          if (dy < 0) {
+            dy = -dy;
+            dx = -dx;
+          }
+
+          if (abs(dx) <= 4 * abs(dx2)) {
+            v = (d2[2*x] + d2[2*x + 2] + 1) >> 1;
+          } else if (dx < 0) {
+            if (dx < -2 * dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, dst_stride, 0, 0, 0, 16);
+            } else if (dx < -dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, dst_stride, 0, 0, 8, 8);
+            } else if (2 * dx < -dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, dst_stride, 0, 4, 8, 4);
+            } else if (3 * dx < -dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, dst_stride, 1, 7, 7, 1);
+            } else {
+              v = reconstruct_v2(d2 + 2*x, 2, dst_stride, 4, 8, 4, 0);
+            }
+          } else {
+            if (dx > 2 * dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, -dst_stride, 0, 0, 0, 16);
+            } else if (dx > dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, -dst_stride, 0, 0, 8, 8);
+            } else if (2 * dx > dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, -dst_stride, 0, 4, 8, 4);
+            } else if (3 * dx > dy) {
+              v = reconstruct_v2(d2 + 2*x, 2, -dst_stride, 1, 7, 7, 1);
+            } else {
+              v = reconstruct_v2(d2 + 2*x, 2, -dst_stride, 4, 8, 4, 0);
+            }
+          }
+          d2[2*x + 1] = v;
+        }
+      } else {
+        for (x = 0; x < w; x++)
+          d[2*x + 1] = (d[2*x] + d[2*x + 2] + 1) >> 1;
+      }
+      d[2*x + 1] = d[2*x];
+      d += dst_stride;
+    }
+  }
+  for (pli = 1; pli < state->io_imgs[OD_FRAME_REC].nplanes; pli++) {
+    const od_img_plane *siplane;
+    od_img_plane *diplane;
+    const unsigned char *src;
+    unsigned char *dst;
+    int xpad;
+    int ypad;
+    int w;
+    int h;
+    int x;
+    int y;
+    siplane = simg->planes + pli;
+    diplane = dimg->planes + pli;
+    xpad = OD_UMV_PADDING >> siplane->xdec;
+    ypad = OD_UMV_PADDING >> siplane->ydec;
+    w = simg->width >> siplane->xdec;
+    h = simg->height >> siplane->ydec;
+    src = siplane->data;
+    dst = diplane->data - (diplane->ystride << 1)*ypad;
+    for (y = -ypad; y < h + ypad + 3; y++) {
+      /*Horizontal filtering:*/
+      if (y < h + ypad) {
+        unsigned char *buf;
+        buf = state->ref_line_buf[y & 7];
+        memset(buf - (xpad << 1), src[0], (xpad - 2) << 1);
+        /*for (x = -xpad; x < -2; x++) {
+          *(buf + (x << 1)) = src[0];
+          *(buf + (x << 1 | 1)) = src[0];
+        }*/
+        *(buf - 4) = src[0];
+        *(buf - 3) = OD_CLAMP255((31*src[0] + src[1] + 16) >> 5);
+        *(buf - 2) = src[0];
+        *(buf - 1) = OD_CLAMP255((36*src[0] - 5*src[1] + src[1] + 16) >> 5);
+        buf[0] = src[0];
+        buf[1] = OD_CLAMP255((20*(src[0] + src[1])
+         - 5*(src[0] + src[2]) + src[0] + src[3] + 16) >> 5);
+        buf[2] = src[1];
+        buf[3] = OD_CLAMP255((20*(src[1] + src[2])
+         - 5*(src[0] + src[3]) + src[0] + src[4] + 16) >> 5);
+        for (x = 2; x < w - 3; x++) {
+          buf[x << 1] = src[x];
+          buf[x << 1 | 1] = OD_CLAMP255((20*(src[x] + src[x + 1])
+           - 5*(src[x - 1] + src[x + 2]) + src[x - 2] + src[x + 3] + 16) >> 5);
+        }
+        buf[x << 1] = src[x];
+        buf[x << 1 | 1] = OD_CLAMP255((20*(src[x] + src[x + 1])
+         - 5*(src[x - 1] + src[x + 2]) + src[x - 2] + src[x + 2] + 16) >> 5);
+        x++;
+        buf[x << 1] = src[x];
+        buf[x << 1 | 1] = OD_CLAMP255((20*(src[x] + src[x + 1])
+         - 5*(src[x - 1] + src[x + 1]) + src[x - 2] + src[x + 1] + 16) >> 5);
+        x++;
+        buf[x << 1] = src[x];
+        buf[x << 1 | 1] =
+         OD_CLAMP255((36*src[x] - 5*src[x - 1] + src[x - 2] + 16) >> 5);
+        x++;
+        buf[x << 1] = src[w - 1];
+        buf[x << 1 | 1] = OD_CLAMP255((31*src[w - 1] + src[w - 2] + 16) >> 5);
+        memset(buf + (++x << 1), src[w - 1], (xpad - 1) << 1);
+        /*for (x++; x < w + xpad; x++) {
+          buf[x << 1] = src[w - 1];
+          buf[x << 1 | 1]=src[w - 1];
+        }*/
+        if (y >= 0 && y + 1 < h) src += siplane->ystride;
+      }
+      /*Vertical filtering:*/
+      if (y >= -ypad + 3) {
+        if (y < 1 || y > h + 3) {
+          OD_COPY(dst - (xpad << 1),
+           state->ref_line_buf[(y - 3) & 7] - (xpad << 1),
+           (w + (xpad << 1)) << 1);
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+          OD_COPY(dst - (xpad << 1),
+           state->ref_line_buf[(y - 3) & 7] - (xpad << 1),
+           (w + (xpad << 1)) << 1);
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1 | 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+        }
+        else {
+          unsigned char *buf[6];
+          buf[0] = state->ref_line_buf[(y - 5) & 7];
+          buf[1] = state->ref_line_buf[(y - 4) & 7];
+          buf[2] = state->ref_line_buf[(y - 3) & 7];
+          buf[3] = state->ref_line_buf[(y - 2) & 7];
+          buf[4] = state->ref_line_buf[(y - 1) & 7];
+          buf[5] = state->ref_line_buf[(y - 0) & 7];
+          OD_COPY(dst - (xpad << 1),
+           state->ref_line_buf[(y - 3) & 7] - (xpad << 1),
+           (w + (xpad << 1)) << 1);
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            *(dst + x) = OD_CLAMP255((20*(*(buf[2] + x) + *(buf[3] + x))
+             - 5*(*(buf[1] + x) + *(buf[4] + x))
+             + *(buf[0] + x) + *(buf[5] + x) + 16) >> 5);
+          }
+          /*fprintf(stderr, "%3i: ", (y - 3) << 1 | 1);
+          for (x = -xpad << 1; x < (w + xpad) << 1; x++) {
+            fprintf(stderr, "%02X", *(dst + x));
+          }
+          fprintf(stderr, "\n");*/
+          dst += diplane->ystride;
+        }
+      }
+    }
+  }
+}
+#else
+# error "Invalid value for OD_UPSAMPLER"
 #endif
 
 /*The data used to build the following two arrays.*/
