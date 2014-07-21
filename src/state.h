@@ -40,6 +40,13 @@ typedef struct od_adapt_ctx      od_adapt_ctx;
 
 extern const od_coeff OD_DC_RES[3];
 
+# define OD_UPSAMPLER_CUBIC  (0)
+# define OD_UPSAMPLER_SINC   (1)
+# define OD_UPSAMPLER_EDI_HV (2)
+# define OD_UPSAMPLER_EDI_VH (3)
+
+# define OD_UPSAMPLER OD_UPSAMPLER_EDI_HV
+
 /*Adaptation speed of scalar Laplace encoding.*/
 # define OD_SCALAR_ADAPT_SPEED (4)
 /*Adaptation speed of intra mode encoding.*/

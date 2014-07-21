@@ -1395,8 +1395,10 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
    enc->state.io_imgs + OD_FRAME_REC);
 #if defined(OD_DUMP_IMAGES)
   /*Dump reference frame.*/
-  /*od_state_dump_img(&enc->state,
-   enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
+  od_state_dump_img(&enc->state,
+    enc->state.io_imgs + OD_FRAME_REC, "ref");
+  od_state_dump_img(&enc->state,
+   enc->state.ref_imgs + enc->state.ref_imgi[OD_FRAME_SELF], "up_ref");
 #endif
 #if defined(OD_ACCOUNTING)
   OD_ASSERT(enc->acct.last_frac_bits == od_ec_enc_tell_frac(&enc->ec));
