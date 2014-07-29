@@ -157,6 +157,7 @@ if ENABLE_TOOLS
 tools_TARGETS = \
 	tools/png2y4m \
 	tools/y4m2png \
+	tools/dump_psnr2 \
 	tools/dump_psnrhvs \
 	tools/block_size_analysis \
 	tools/divu_const \
@@ -216,6 +217,14 @@ tools_y4m2png_SOURCES = \
 	tools/y4m2png.c
 tools_y4m2png_CFLAGS = $(THEORA_CFLAGS) $(OGG_CFLAGS) $(PNG_CFLAGS)
 tools_y4m2png_LDADD = $(THEORA_LIBS) $(OGG_LIBS) $(PNG_LIBS)
+
+# dump_psnr2
+tools_dump_psnr2_SOURCES = \
+	tools/vidinput.c \
+	tools/y4m_input.c \
+	tools/dump_psnr2.c
+tools_dump_psnr2_CFLAGS = $(THEORA_CFLAGS) $(OGG_CFLAGS) $(PNG_CFLAGS)
+tools_dump_psnr2_LDADD = $(THEORA_LIBS) $(OGG_LIBS) $(PNG_LIBS) $(LIBM)
 
 # dump_psnrhvs
 tools_dump_psnrhvs_SOURCES = \
