@@ -650,7 +650,12 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
           }
 
           if (abs(dx) <= 4 * abs(dx2)) {
-            v = (s[x] + s[x + 1] + 1) >> 1;
+            if (x < 2 || x >= w - 3) {
+              v = (s[x] + s[x + 1] + 1) >> 1;
+            } else {
+              v = (20*(s[x] + s[x + 1])
+               - 5*(s[x - 1] + s[x + 2]) + s[x - 2] + s[x + 3] + 16) >> 5;
+            }
           } else if (dx < 0) {
             if (dx < -2 * dy) {
               v = reconstruct_v(s + x, 1, src_stride, 0, 0, 0, 16);
@@ -684,7 +689,13 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
       } else {
         for (x = 0; x < w - 1; x++) {
           d[x * 2] = s[x];
-          d[x * 2 + 1] = (s[x] + s[x + 1] + 1) >> 1;
+          if (x < 2 || x >= w - 3) {
+            d[x * 2 + 1] = (s[x] + s[x + 1] + 1) >> 1;
+          } else {
+            d[x * 2 + 1] =
+              (20*(s[x] + s[x + 1])
+               - 5*(s[x - 1] + s[x + 2]) + s[x - 2] + s[x + 3] + 16) >> 5;
+          }
         }
         d[x * 2] = s[x];
         d[x * 2 + 1] = s[x];
@@ -708,6 +719,10 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
       unsigned char *d1 = d;
       unsigned char *d2 = d + dst_stride;
       unsigned char *d3 = d + 2*dst_stride;
+      unsigned char *d5 = d + 4*dst_stride;
+      unsigned char *d7 = d + 6*dst_stride;
+      unsigned char *dm1 = d - 2*dst_stride;
+      unsigned char *dm3 = d - 4*dst_stride;
 
       for (x = -2*xpad; x < w*2  + xpad*2; x++) {
         if (x >= MARGIN && x < w * 2 - MARGIN - 1) {
@@ -741,7 +756,12 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
           }
 
           if (abs(dx) <= 4*abs(dx2)) {
-            v = (d1[x] + d3[x] + 1) >> 1;
+            if (y < 2 || y >= w - 3) {
+              v = (d1[x] + d3[x] + 1) >> 1;
+            } else {
+              v = (20*(d1[x] + d3[x])
+               - 5*(dm1[x] + d5[x]) + dm3[x] + d7[x] + 16) >> 5;
+            }
           } else if (dx < 0) {
             if (dx < -2 * dy) {
               v = reconstruct_h(d1 + x, d3 + x, 0, 0, 0, 16);
@@ -769,7 +789,12 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
           }
           d2[x] = OD_CLAMP255(v);
         } else {
-          d2[x] = (d1[x] + d3[x] + 1) >> 1;
+          if (y < 2 || y >= w - 3) {
+            d2[x] = (d1[x] + d3[x] + 1) >> 1;
+          } else {
+            d2[x] = (20*(d1[x] + d3[x])
+                     - 5*(dm1[x] + d5[x]) + dm3[x] + d7[x] + 16) >> 5;
+          }
         }
       }
       d += 2*dst_stride;
