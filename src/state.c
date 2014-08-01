@@ -311,6 +311,7 @@ void od_adapt_ctx_reset(od_adapt_ctx *state, int is_keyframe) {
   memcpy(state->mode_probs, OD_INTRA_PRED_PROB_4x4, 3*OD_INTRA_NMODES*OD_INTRA_NCONTEXTS);
 }
 
+#if OD_UPSAMPLER == OD_UPSAMPLER_EDI_HV || OD_UPSAMPLER == OD_UPSAMPLER_EDI_VH
 static int reconstruct_v(const unsigned char *src, int xstride, int ystride,
  int a, int b, int c, int d)
 {
@@ -342,6 +343,42 @@ static int reconstruct_h(const unsigned char *d1, const unsigned char *d2,
   x += d2[3] * a;
   return (x + 16) >> 5;
 }
+
+static int sinc_filter(const unsigned char *s, int stride) {
+  return 20*s[0] - 5*s[1*stride] + s[2*stride];
+}
+
+static int reconstruct_v2(const unsigned char *s, int xstride, int ystride,
+ int a, int b, int c, int d)
+{
+  int x;
+
+  x = sinc_filter(s + 0 - 3 * ystride, -xstride) * a;
+  x += sinc_filter(s + 0 - 2 * ystride, -xstride) * b;
+  x += sinc_filter(s + 0 - 1 * ystride, -xstride) * c;
+  x += sinc_filter(s + 0 - 0 * ystride, -xstride) * d;
+  x += sinc_filter(s + 1*xstride + 0 * ystride, xstride) * d;
+  x += sinc_filter(s + 1*xstride + 1 * ystride, xstride) * c;
+  x += sinc_filter(s + 1*xstride + 2 * ystride, xstride) * b;
+  x += sinc_filter(s + 1*xstride + 3 * ystride, xstride) * a;
+  return (x + 16*16) >> (5+4);
+}
+
+static int reconstruct_h2(const unsigned char *s, int stride, int a, int b, int c, int d)
+{
+  int x;
+
+  x = sinc_filter(s - 3, -stride) * a;
+  x += sinc_filter(s - 2, -stride) * b;
+  x += sinc_filter(s - 1, -stride) * c;
+  x += sinc_filter(s, -stride) * d;
+  x += sinc_filter(s + stride + 0, stride) * d;
+  x += sinc_filter(s + stride + 1, stride) * c;
+  x += sinc_filter(s + stride + 2, stride) * b;
+  x += sinc_filter(s + stride + 3, stride) * a;
+  return (x + 16*16) >> (5+4);
+}
+#endif
 
 /*Upsamples the reconstructed image to a reference image.
   TODO: Pipeline with reconstruction.*/
@@ -657,28 +694,56 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
                - 5*(s[x - 1] + s[x + 2]) + s[x - 2] + s[x + 3] + 16) >> 5;
             }
           } else if (dx < 0) {
-            if (dx < -2 * dy) {
-              v = reconstruct_v(s + x, 1, src_stride, 0, 0, 0, 16);
-            } else if (dx < -dy) {
-              v = reconstruct_v(s + x, 1, src_stride, 0, 0, 8, 8);
-            } else if (2 * dx < -dy) {
-              v = reconstruct_v(s + x, 1, src_stride, 0, 4, 8, 4);
-            } else if (3 * dx < -dy) {
-              v = reconstruct_v(s + x, 1, src_stride, 1, 7, 7, 1);
+            if (x < 2 || x >= w - 3) {
+              if (dx < -2 * dy) {
+                v = reconstruct_v(s + x, 1, src_stride, 0, 0, 0, 16);
+              } else if (dx < -dy) {
+                v = reconstruct_v(s + x, 1, src_stride, 0, 0, 8, 8);
+              } else if (2 * dx < -dy) {
+                v = reconstruct_v(s + x, 1, src_stride, 0, 4, 8, 4);
+              } else if (3 * dx < -dy) {
+                v = reconstruct_v(s + x, 1, src_stride, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_v(s + x, 1, src_stride, 4, 8, 4, 0);
+              }
             } else {
-              v = reconstruct_v(s + x, 1, src_stride, 4, 8, 4, 0);
+              if (dx < -2 * dy) {
+                v = reconstruct_v2(s + x, 1, src_stride, 0, 0, 0, 16);
+              } else if (dx < -dy) {
+                v = reconstruct_v2(s + x, 1, src_stride, 0, 0, 8, 8);
+              } else if (2 * dx < -dy) {
+                v = reconstruct_v2(s + x, 1, src_stride, 0, 4, 8, 4);
+              } else if (3 * dx < -dy) {
+                v = reconstruct_v2(s + x, 1, src_stride, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_v2(s + x, 1, src_stride, 4, 8, 4, 0);
+              }
             }
           } else {
-            if (dx > 2 * dy) {
-              v = reconstruct_v(s + x, 1, -src_stride, 0, 0, 0, 16);
-            } else if (dx > dy) {
-              v = reconstruct_v(s + x, 1, -src_stride, 0, 0, 8, 8);
-            } else if (2 * dx > dy) {
-              v = reconstruct_v(s + x, 1, -src_stride, 0, 4, 8, 4);
-            } else if (3 * dx > dy) {
-              v = reconstruct_v(s + x, 1, -src_stride, 1, 7, 7, 1);
+            if (x < 2 || x >= w - 3) {
+              if (dx > 2 * dy) {
+                v = reconstruct_v(s + x, 1, -src_stride, 0, 0, 0, 16);
+              } else if (dx > dy) {
+                v = reconstruct_v(s + x, 1, -src_stride, 0, 0, 8, 8);
+              } else if (2 * dx > dy) {
+                v = reconstruct_v(s + x, 1, -src_stride, 0, 4, 8, 4);
+              } else if (3 * dx > dy) {
+                v = reconstruct_v(s + x, 1, -src_stride, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_v(s + x, 1, -src_stride, 4, 8, 4, 0);
+              }
             } else {
-              v = reconstruct_v(s + x, 1, -src_stride, 4, 8, 4, 0);
+              if (dx > 2 * dy) {
+                v = reconstruct_v2(s + x, 1, -src_stride, 0, 0, 0, 16);
+              } else if (dx > dy) {
+                v = reconstruct_v2(s + x, 1, -src_stride, 0, 0, 8, 8);
+              } else if (2 * dx > dy) {
+                v = reconstruct_v2(s + x, 1, -src_stride, 0, 4, 8, 4);
+              } else if (3 * dx > dy) {
+                v = reconstruct_v2(s + x, 1, -src_stride, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_v2(s + x, 1, -src_stride, 4, 8, 4, 0);
+              }
             }
           }
           d[x * 2] = s[x];
@@ -763,28 +828,56 @@ void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
                - 5*(dm1[x] + d5[x]) + dm3[x] + d7[x] + 16) >> 5;
             }
           } else if (dx < 0) {
-            if (dx < -2 * dy) {
-              v = reconstruct_h(d1 + x, d3 + x, 0, 0, 0, 16);
-            } else if (dx < -dy) {
-              v = reconstruct_h(d1 + x, d3 + x, 0, 0, 8, 8);
-            } else if (2 * dx < -dy) {
-              v = reconstruct_h(d1 + x, d3 + x, 0, 4, 8, 4);
-            } else if (3 * dx < -dy) {
-              v = reconstruct_h(d1 + x, d3 + x, 1, 7, 7, 1);
+            if (y < 2 || y >= w - 3) {
+              if (dx < -2 * dy) {
+                v = reconstruct_h(d1 + x, d3 + x, 0, 0, 0, 16);
+              } else if (dx < -dy) {
+                v = reconstruct_h(d1 + x, d3 + x, 0, 0, 8, 8);
+              } else if (2 * dx < -dy) {
+                v = reconstruct_h(d1 + x, d3 + x, 0, 4, 8, 4);
+              } else if (3 * dx < -dy) {
+                v = reconstruct_h(d1 + x, d3 + x, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_h(d1 + x, d3 + x, 4, 8, 4, 0);
+              }
             } else {
-              v = reconstruct_h(d1 + x, d3 + x, 4, 8, 4, 0);
+              if (dx < -2 * dy) {
+                v = reconstruct_h2(d1 + x, 2*dst_stride, 0, 0, 0, 16);
+              } else if (dx < -dy) {
+                v = reconstruct_h2(d1 + x, 2*dst_stride, 0, 0, 8, 8);
+              } else if (2 * dx < -dy) {
+                v = reconstruct_h2(d1 + x, 2*dst_stride, 0, 4, 8, 4);
+              } else if (3 * dx < -dy) {
+                v = reconstruct_h2(d1 + x, 2*dst_stride, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_h2(d1 + x, 2*dst_stride, 4, 8, 4, 0);
+              }
             }
           } else {
-            if (dx > 2 * dy) {
-              v = reconstruct_h(d3 + x, d1 + x, 0, 0, 0, 16);
-            } else if (dx > dy) {
-              v = reconstruct_h(d3 + x, d1 + x, 0, 0, 8, 8);
-            } else if (2 * dx > dy) {
-              v = reconstruct_h(d3 + x, d1 + x, 0, 4, 8, 4);
-            } else if (3 * dx > dy) {
-              v = reconstruct_h(d3 + x, d1 + x, 1, 7, 7, 1);
+            if (y < 2 || y >= w - 3) {
+              if (dx > 2 * dy) {
+                v = reconstruct_h(d3 + x, d1 + x, 0, 0, 0, 16);
+              } else if (dx > dy) {
+                v = reconstruct_h(d3 + x, d1 + x, 0, 0, 8, 8);
+              } else if (2 * dx > dy) {
+                v = reconstruct_h(d3 + x, d1 + x, 0, 4, 8, 4);
+              } else if (3 * dx > dy) {
+                v = reconstruct_h(d3 + x, d1 + x, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_h(d3 + x, d1 + x, 4, 8, 4, 0);
+              }
             } else {
-              v = reconstruct_h(d3 + x, d1 + x, 4, 8, 4, 0);
+              if (dx > 2 * dy) {
+                v = reconstruct_h2(d3 + x, -2*dst_stride, 0, 0, 0, 16);
+              } else if (dx > dy) {
+                v = reconstruct_h2(d3 + x, -2*dst_stride, 0, 0, 8, 8);
+              } else if (2 * dx > dy) {
+                v = reconstruct_h2(d3 + x, -2*dst_stride, 0, 4, 8, 4);
+              } else if (3 * dx > dy) {
+                v = reconstruct_h2(d3 + x, -2*dst_stride, 1, 7, 7, 1);
+              } else {
+                v = reconstruct_h2(d3 + x, -2*dst_stride, 4, 8, 4, 0);
+              }
             }
           }
           d2[x] = OD_CLAMP255(v);
