@@ -15,7 +15,8 @@ echo $BASENAME
 WIDTH=$(head -1 $FILE | cut -d\  -f 2 | tr -d 'W')
 HEIGHT=$(head -1 $FILE | cut -d\  -f 3 | tr -d 'H')
 
-RANGE="1 2 3 4 5 6 7 9 11 13 16 20 25 30 37 45 55 67 81 99 122 148 181 221 270 330 400 500"
+RANGE="45 81 160 270 400"
+#RANGE="45"
 
 for x in $RANGE; do
   OD_DUMP_IMAGES_SUFFIX=$BASENAME $ENCODER_EXAMPLE -k 256 -v $x $FILE -o $BASENAME.ogv 2> $BASENAME-$x-enc.out
@@ -29,5 +30,5 @@ for x in $RANGE; do
   FASTSSIM=$($DUMP_FASTSSIM -c $FILE 00000000out-$BASENAME.y4m 2> /dev/null | grep Total | tr -s ' ' | cut -d\  -f $((4+$PLANE*2)))
   rm 00000000out-$BASENAME.y4m $BASENAME.ogv $BASENAME-$x-enc.out $BASENAME-psnr.out
   echo $x $PIXELS $SIZE $PSNR $PSNRHVS $SSIM $FASTSSIM >> $BASENAME.out
-  #tail -1 $BASENAME.out
+  tail -1 $BASENAME.out
 done
