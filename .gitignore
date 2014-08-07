@@ -70,6 +70,9 @@ src/tests/test_coef_coder
 src/tests/test_divu_small
 src/tests/test_filters
 tools/block_size_analysis
+tools/to_monochrome
+tools/downsample
+tools/upsample
 tools/dump_psnrhvs
 tools/gen_cdf
 tools/gen_laplace_tables
