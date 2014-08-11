@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include <stdlib.h>
 #include <string.h>
 #include "vidinput.h"
+#include "qr.h"
 #include "../src/state.h"
 #if defined(_WIN32)
 # include <io.h>
@@ -38,6 +39,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include "getopt.h"
 #include <math.h>
 
+#define ORIGINAL_FILTERS 0
+
+#define MIN(a,b) ((a)>(b)?(b):(a))
+
 static void usage(char **_argv) {
   fprintf(stderr, "Usage: %s <input> <output>\n"
    "    <input> must be a YUV4MPEG file.\n\n", _argv[0]);
@@ -45,124 +50,89 @@ static void usage(char **_argv) {
 
 static const char *CHROMA_TAGS[4] = { " C420jpeg", "", " C422jpeg", " C444" };
 
-#define TAPS 6
+#define MAX_TAPS 16
 
 enum filters {
-  SRC_PIXEL = 0,
-  EDGE_FILTER_1,
-  EDGE_FILTER_2,
-  EDGE_FILTER_3,
-  EDGE_FILTER_4,
-  EDGE_FILTER_5,
-  FALLBACK_FILTER,
+  EDGE_FILTER_1_H = 0,
+  EDGE_FILTER_1_V,
+  EDGE_FILTER_2_H,
+  EDGE_FILTER_2_V,
+  EDGE_FILTER_3_H,
+  EDGE_FILTER_3_V,
+  EDGE_FILTER_4_H,
+  EDGE_FILTER_4_V,
+  EDGE_FILTER_5_H,
+  EDGE_FILTER_5_V,
+  FALLBACK_FILTER_H,
+  FALLBACK_FILTER_V,
   FILTERS_MAX
 };
 
-/* struct response_position { */
-/*   int y; */
-/*   int x; */
-/* }; */
-
-/* struct predictor_column { */
-/*   unsigned char *buf; */
-/*   int buf_size; */
-/*   int length; */
-/* }; */
-
-
-/* struct filter_regression { */
-/*   struct predictor_column pred_col[TAPS]; */
-/*   struct response_position *resp_pos; */
-/*   int *resp; */
-/* } */
-/* struct filter_regression { */
-/*   unsigned char *pred_col[TAPS]; */
-/*   int pred_col_sum[TAPS]; */
-/*   struct response_position *resp_pos; */
-/*   unsigned char *resp; */
-/*   int allocated_length; */
-/*   int length; */
-/* }; */
 struct filter_regression {
-  unsigned char *pred_col[TAPS];
-  uint64_t pred_col_norm[TAPS];
+  int taps;
+  int *pred_col[MAX_TAPS];
   unsigned char *resp;
   int allocated_length;
   int length;
 };
 
-static void regression_init(struct filter_regression *reg) {
+static void regression_init(struct filter_regression *reg, int taps) {
   int i;
   int length = 1024*1024;
-  for (i = 0; i < TAPS; i++) {
-    reg->pred_col[i] = malloc(length);
-    reg->pred_col_norm[i] = 0;
+  reg->taps = taps;
+  for (i = 0; i < taps; i++) {
+    reg->pred_col[i] = malloc(length*sizeof(**reg->pred_col));
   }
-  /*reg->resp_pos = malloc(length*sizeof(*reg->resp_pos));*/
   reg->resp = malloc(length*sizeof(*reg->resp));
   reg->allocated_length = length;
   reg->length = 0;
 }
-#if 0
-static void regression_add_pos(struct filter_regression *reg, int x, int y) {
-  int i;
-  reg->length++;
-  if (reg->length > reg->allocated_length) {
-    reg->allocated_length *= 2;
-    for (i = 0; i < TAPS; i++) {
-      reg->pred_col[i] = realloc(reg->pred_col[i], reg->allocated_length);
-    }
-    /*reg->resp_pos = realloc(reg->resp_pos,
-      reg->allocated_length*sizeof(*reg->resp_pos));*/
-    reg->resp = realloc(reg->resp, reg->allocated_length*sizeof(*reg->resp));
-  }
-  /*reg->resp_pos[reg->length - 1].x = x;
-    reg->resp_pos[reg->length - 1].y = y;*/
-}
-#endif
 
 static void regression_add_resp(struct filter_regression *reg, unsigned char value) {
   int i;
   reg->length++;
   if (reg->length > reg->allocated_length) {
     reg->allocated_length *= 2;
-    for (i = 0; i < TAPS; i++) {
-      reg->pred_col[i] = realloc(reg->pred_col[i], reg->allocated_length);
+    for (i = 0; i < reg->taps; i++) {
+      reg->pred_col[i] = realloc(reg->pred_col[i], reg->allocated_length*sizeof(**reg->pred_col));
     }
     reg->resp = realloc(reg->resp, reg->allocated_length*sizeof(*reg->resp));
   }
   reg->resp[reg->length - 1] = value;
 }
 
-static void regression_set_tap(struct filter_regression *reg, int tap, unsigned char value) {
+static void regression_set_tap(struct filter_regression *reg, int tap, int value) {
   reg->pred_col[tap][reg->length - 1] = value;
-  reg->pred_col_norm[tap] += value*value;
 }
-/*
-static void regression_set_response(struct filter_regression *reg, unsigned char *src,
- int src_stride) {
-  int i;
-  for (i = 0; i < reg->length; i++) {
-    reg->resp[i] = src[reg->resp_pos[i].y*src_stride + reg->resp_pos[i].x];
-  }
-}
-*/
 static void regression_solve(struct filter_regression *reg) {
-  double orig_filter[TAPS] = { 1.0/32.0, -5.0/32.0, 20.0/32.0, 20.0/32.0, -5.0/32.0, 1.0/32.0 };
-  double filter[TAPS];
-  int i, tap;
+  int m = reg->length;
+  int n = reg->taps;
+  double *sol;
+  double *mat;
+  double d[MAX_TAPS];
+  int rank;
+  int i, j;
   double tap_sum = 0;
-  for (tap = 0; tap < TAPS; tap++) {
-    uint64_t dot_prod = 0;
-    for (i = 0; i < reg->length; i++) {
-      dot_prod += reg->resp[i] * reg->pred_col[tap][i];
+  sol = malloc(m*sizeof(*sol));
+  for (i = 0; i < m; i++) {
+    sol[i] = reg->resp[i];
+  }
+  mat = malloc(m*n*sizeof(*mat));
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++) {
+      mat[i*m + j] = reg->pred_col[i][j];
     }
-    printf("dot: %lu\n", dot_prod);
-    printf("norm: %lu\n", reg->pred_col_norm[tap]);
-    /*filter[tap] = (double)dot_prod/(reg->pred_col_sum[tap]*reg->pred_col_sum[tap]);*/
-    filter[tap] = (double)dot_prod/reg->pred_col_norm[tap];
-    printf("Tap %d: %f\n", tap, filter[tap]);
-    tap_sum += filter[tap];
+  }
+  rank = qrdecomp_hh(mat, m, d, NULL, 0, NULL, n, m);
+  if (rank != n) {
+    fprintf(stderr, "rank (%d) != n (%d)\n", rank, n);
+    exit(1);
+  }
+  qrsolve_hh(mat, m, d, sol, m, n, m, 1);
+
+  for (i = 0; i < reg->taps; i++) {
+    printf("Tap %d: %f\n", i, sol[i]);
+    tap_sum += sol[i];
   }
   printf("Tap sum: %f\n", tap_sum);
 }
@@ -204,7 +174,7 @@ static int reconstruct_h(const unsigned char *s, int xstride, int ystride,
 }
 
 static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
- struct filter_regression *reg, unsigned char *up_ref, int up_ref_stride) {
+ struct filter_regression *regs, unsigned char *up_ref, int up_ref_stride) {
   int pli;
   for (pli = 0; pli < 1; pli++) {
     const od_img_plane *siplane;
@@ -304,16 +274,18 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
         }
 
         if (abs(dx) <= 4 * abs(dx2)) {
+          struct filter_regression *r = regs + FALLBACK_FILTER_H;
+#if ORIGINAL_FILTERS
           v = (20*(d[x] + d[x + 2])
                - 5*(d[x - 2] + d[x + 4]) + d[x - 4] + d[x + 6] + 16) >> 5;
-          /* XXX */
-          regression_add_resp(reg, up_ref[2*y*up_ref_stride + (x + 1)]);
-          regression_set_tap(reg, 0, d[x - 4]);
-          regression_set_tap(reg, 1, d[x - 2]);
-          regression_set_tap(reg, 2, d[x]);
-          regression_set_tap(reg, 3, d[x + 2]);
-          regression_set_tap(reg, 4, d[x + 4]);
-          regression_set_tap(reg, 5, d[x + 6]);
+#else
+          v = (592*(d[x] + d[x + 2]) - 70*(d[x - 2] + d[x + 4])
+            - 10*(d[x - 4] + d[x + 6]) + 512) >> 10;
+#endif
+          regression_add_resp(r , up_ref[2*y*up_ref_stride + (x + 1)]);
+          regression_set_tap(r, 0, d[x - 4] + d[x + 6]);
+          regression_set_tap(r, 1, d[x - 2] + d[x + 4]);
+          regression_set_tap(r, 2, d[x] + d[x + 2]);
         } else if (dx < 0) {
           if (dx < -2 * dy) {
             v = reconstruct_v(d + x, 2, 2*dst_stride, 0, 0, 0, 16);
@@ -388,8 +360,18 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
           }
 
           if (abs(dx) <= 4*abs(dx2)) {
+            struct filter_regression *r = regs + FALLBACK_FILTER_V;
+#if ORIGINAL_FILTERS
             v = (20*(d0[x] + d2[x])
              - 5*(dm2[x] + d4[x]) + dm4[x] + d6[x] + 16) >> 5;
+#else
+            v = (403*(d0[x] + d2[x])
+                 + 42*(dm2[x] + d4[x]) + 67*(dm4[x] + d6[x]) + 512) >> 10;
+#endif
+            regression_add_resp(r , up_ref[2*(y + 1)*up_ref_stride + x]);
+            regression_set_tap(r, 0, d[x - 4] + d[x + 6]);
+            regression_set_tap(r, 1, d[x - 2] + d[x + 4]);
+            regression_set_tap(r, 2, d[x] + d[x + 2]);
           } else if (dx < 0) {
             if (dx < -2 * dy) {
               v = reconstruct_h(d0 + x, 1, 2*dst_stride, 0, 0, 0, 16);
@@ -565,7 +547,7 @@ int main(int _argc, char **_argv) {
   int c;
   od_state state;
   daala_info info;
-  struct filter_regression reg;
+  struct filter_regression regs[FILTERS_MAX];
 
   limit = 0;
   while ((c = getopt_long(_argc, _argv, optstring, long_options,
@@ -586,6 +568,24 @@ int main(int _argc, char **_argv) {
     usage(_argv);
     exit(EXIT_FAILURE);
   }
+
+  /*  1  2  3  4  3
+      2  4  6  8  6 || *2 (a a b b ...)
+      4  8 12 16 12 || *3 (sinc ...)*/
+  regression_init(regs + EDGE_FILTER_1_H, 4);
+  regression_init(regs + EDGE_FILTER_1_V, 4);
+  regression_init(regs + EDGE_FILTER_2_H, 8);
+  regression_init(regs + EDGE_FILTER_2_V, 8);
+  regression_init(regs + EDGE_FILTER_3_H, 12);
+  regression_init(regs + EDGE_FILTER_3_V, 12);
+  regression_init(regs + EDGE_FILTER_4_H, 16);
+  regression_init(regs + EDGE_FILTER_4_V, 16);
+  regression_init(regs + EDGE_FILTER_5_H, 12);
+  regression_init(regs + EDGE_FILTER_5_V, 12);
+  regression_init(regs + FALLBACK_FILTER_H, 3);
+  regression_init(regs + FALLBACK_FILTER_V, 3);
+
+  /* TODO: for argv < argc ... */
   fin = strcmp(_argv[optind], "-") == 0 ? stdin : fopen(_argv[optind], "rb");
   if (fin == NULL) {
     fprintf(stderr, "Unable to open '%s' for extraction.\n", _argv[optind]);
@@ -595,7 +595,6 @@ int main(int _argc, char **_argv) {
   if (video_input_open(&vid1, fin) < 0) exit(EXIT_FAILURE);
   video_input_get_info(&vid1, &info1);
 
-  /*regression_init(&reg);*/
   daala_info_init(&info);
   for (pli = 0; pli < 3; pli++) {
     xdec[pli] = pli && !(info1.pixel_fmt&1);
@@ -668,11 +667,8 @@ int main(int _argc, char **_argv) {
         src += src_stride;
       }
     }
-    regression_init(&reg);
-    train_upsample(&state, dimg, simg, &reg, in[0].data + info1.pic_y*in[0].stride + info1.pic_x,
+    train_upsample(&state, dimg, simg, regs, in[0].data + info1.pic_y*in[0].stride + info1.pic_x,
                    in[0].stride);
-    regression_solve(&reg);
-    /*printf("%f\n", regression_solve(&reg, dimg->planes[0].data, dimg->planes[0].ystride));*/
     fprintf(fout, "FRAME\n");
     for (pli = 0; pli < 3; pli++) {
       od_img_plane *diplane = dimg->planes + pli;
@@ -684,8 +680,9 @@ int main(int _argc, char **_argv) {
         }
       }
     }
-    fprintf(stderr, "Completed frame %d.\n", frameno);
   }
+  regression_solve(regs + FALLBACK_FILTER_H);
+  /*regression_solve(regs + FALLBACK_FILTER_V);*/
   video_input_close(&vid1);
   /*regression_solve(&reg);*/
   if (fout != stdout) fclose(fout);
