@@ -326,6 +326,7 @@ tools_train_edi_SOURCES = \
 	src/info.c \
 	src/mc.c \
 	src/state.c \
+	tools/qr.c \
 	tools/train_edi.c
 if ENABLE_X86ASM
 tools_train_edi_SOURCES += \
