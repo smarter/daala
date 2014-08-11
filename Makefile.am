@@ -163,6 +163,7 @@ tools_TARGETS = \
 	tools/to_monochrome \
 	tools/downsample \
 	tools/upsample \
+	tools/train_edi \
 	tools/divu_const \
 	tools/plot_intra_maps \
 	tools/init_intra_maps \
@@ -312,6 +313,28 @@ tools_upsample_SOURCES += \
 endif
 tools_upsample_CFLAGS = $(THEORA_CFLAGS) $(OGG_CFLAGS) $(PNG_CFLAGS)
 tools_upsample_LDADD = $(THEORA_LIBS) $(OGG_LIBS) $(PNG_LIBS) $(LIBM)
+
+# train_edi
+tools_train_edi_SOURCES = \
+	tools/vidinput.c \
+	tools/y4m_input.c \
+	src/intradata.c \
+	src/internal.c \
+	src/generic_code.c \
+	src/switch_table.c \
+	src/logging.c \
+	src/info.c \
+	src/mc.c \
+	src/state.c \
+	tools/train_edi.c
+if ENABLE_X86ASM
+tools_train_edi_SOURCES += \
+	src/x86/cpu.c \
+	src/x86/sse2mc.c \
+	src/x86/x86state.c
+endif
+tools_train_edi_CFLAGS = $(THEORA_CFLAGS) $(OGG_CFLAGS) $(PNG_CFLAGS)
+tools_train_edi_LDADD = $(THEORA_LIBS) $(OGG_LIBS) $(PNG_LIBS) $(LIBM)
 
 # divu_const
 tools_divu_const_SOURCES = \
