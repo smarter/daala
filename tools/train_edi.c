@@ -44,8 +44,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 static void usage(char **_argv) {
-  fprintf(stderr, "Usage: %s <input> <output>\n"
-   "    <input> must be a YUV4MPEG file.\n\n", _argv[0]);
+  fprintf(stderr, "Usage: %s [options] <input1> <input2> ...\n"
+   "    The inputs must be YUV4MPEG videos.\n\n"
+   "    Options:\n\n"
+   "      -o <outputX.y4m> Output an input file after downsampling and\n"
+   "                       upsampling with EDI. Use this option repeatedly to\n"
+   "                       output several resampled input files.\n",
+   _argv[0]);
 }
 
 static const char *CHROMA_TAGS[4] = { " C420jpeg", "", " C422jpeg", " C444" };
@@ -130,11 +135,12 @@ static void regression_solve(struct filter_regression *reg) {
   }
   qrsolve_hh(mat, m, d, sol, m, n, m, 1);
 
+  printf("[");
   for (i = 0; i < reg->taps; i++) {
-    printf("Tap %d: %f\n", i, sol[i]);
+    printf(" %f" , sol[i]);
     tap_sum += sol[i];
   }
-  printf("Tap sum: %f\n", tap_sum);
+  printf(" ] sum: %f\n", tap_sum);
 }
 
 static int sinc_filter(const unsigned char *s, int stride) {
@@ -154,6 +160,41 @@ static int reconstruct_v(const unsigned char *s, int xstride, int ystride,
   x += sinc_filter(s + 1*xstride + 1 * ystride, xstride) * c;
   x += sinc_filter(s + 1*xstride + 2 * ystride, xstride) * b;
   x += sinc_filter(s + 1*xstride + 3 * ystride, xstride) * a;
+  return (x + 16*16) >> (5+4);
+}
+
+static int taps3(const unsigned char *s, int stride, int t1, int t2, int t3) {
+  return t1*s[0] + t2*s[1*stride] + t3*s[2*stride];
+}
+
+static int reconstruct_v2(const unsigned char *s, int xstride, int ystride,
+ struct filter_regression *r,
+ int a1, int a2, int a3, int b1, int b2, int b3, int c1, int c2, int c3,
+ int d1, int d2, int d3)
+{
+  int x;
+
+  regression_set_tap(r, 0, s[-3*ystride] + s[3*ystride + xstride]);
+  regression_set_tap(r, 1, s[-3*ystride - xstride] + s[3*ystride + 2*xstride]);
+  regression_set_tap(r, 2, s[-3*ystride - 2*xstride] + s[3*ystride + 3*xstride]);
+  regression_set_tap(r, 3, s[-2*ystride] + s[2*ystride + xstride]);
+  regression_set_tap(r, 4, s[-2*ystride - xstride] + s[2*ystride + 2*xstride]);
+  regression_set_tap(r, 5, s[-2*ystride - 2*xstride] + s[2*ystride + 3*xstride]);
+  regression_set_tap(r, 6, s[-1*ystride] + s[1*ystride + xstride]);
+  regression_set_tap(r, 7, s[-1*ystride - xstride] + s[1*ystride + 2*xstride]);
+  regression_set_tap(r, 8, s[-1*ystride - 2*xstride] + s[1*ystride + 3*xstride]);
+  regression_set_tap(r, 9, s[-0*ystride] + s[0*ystride + xstride]);
+  regression_set_tap(r, 10, s[-0*ystride - xstride] + s[0*ystride + 2*xstride]);
+  regression_set_tap(r, 11, s[-0*ystride - 2*xstride] + s[0*ystride + 3*xstride]);
+
+  x = taps3(s - 3*ystride, -xstride, a1, a2, a3);
+  x += taps3(s - 2*ystride, -xstride, b1, b2, b3);
+  x += taps3(s - 1*ystride, -xstride, c1, c2, c3);
+  x += taps3(s - 0*ystride, -xstride, d1, d2, d3);
+  x += taps3(s + 0*ystride + xstride, xstride, d1, d2, d3);
+  x += taps3(s + 1*ystride + xstride, xstride, c1, c2, c3);
+  x += taps3(s + 2*ystride + xstride, xstride, b1, b2, b3);
+  x += taps3(s + 3*ystride + xstride, xstride, a1, a2, a3);
   return (x + 16*16) >> (5+4);
 }
 
@@ -288,7 +329,16 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
           regression_set_tap(r, 2, d[x] + d[x + 2]);
         } else if (dx < 0) {
           if (dx < -2 * dy) {
-            v = reconstruct_v(d + x, 2, 2*dst_stride, 0, 0, 0, 16);
+            struct filter_regression *r = regs + EDGE_FILTER_1_H;
+            regression_add_resp(r , up_ref[2*y*up_ref_stride + (x + 1)]);
+#if ORIGINAL_FILTERS
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, r,
+             0, 0, 0,   0, 0, 0,    0, 0, 0,    20*16, -5*16, 1*16);
+#else
+            v = reconstruct_v2(d + x, 2, 2*dst_stride, r,
+             0, 0, 0,   0, 0, 0,    0, 0, 0,    312, -69, 13);
+            /*22, 8, 26, -15, -7, 33, -6, 39, -38, 270, -70, -6);*/
+#endif
           } else if (dx < -dy) {
             v = reconstruct_v(d + x, 2, 2*dst_stride, 0, 0, 8, 8);
           } else if (2 * dx < -dy) {
@@ -528,14 +578,14 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
 }
 
 int main(int _argc, char **_argv) {
-  const char *optstring = "hv?";
+  const char *optstring = "o:hv?";
   const struct option long_options[] = {
     { NULL, 0, NULL, 0 }
   };
-  FILE *fin;
-  FILE *fout;
-  video_input vid1;
-  video_input_info info1;
+  video_input vid[1024];
+  FILE *fout[1024] = { 0 };
+  int input_files = 0;
+  int output_files = 0;
   int frameno;
   int pli;
   int xdec[3];
@@ -548,143 +598,157 @@ int main(int _argc, char **_argv) {
   od_state state;
   daala_info info;
   struct filter_regression regs[FILTERS_MAX];
+  int i;
 
   limit = 0;
   while ((c = getopt_long(_argc, _argv, optstring, long_options,
    &long_option_index)) != EOF) {
     switch (c) {
+      case 'o': {
+        fout[output_files] = strcmp(optarg, "-") == 0 ? stdout : fopen(optarg,
+         "wb");
+        if (fout[output_files] == NULL) {
+          fprintf(stderr, "Error opening output file \"%s\".\n", optarg);
+          return 1;
+        }
+        output_files++;
+        break;
+      }
       case 'v':
       case '?':
       case 'h':
-      default:
-      {
+      default: {
         usage(_argv);
         exit(EXIT_FAILURE);
+        break;
       }
-      break;
     }
-  }
-  if (optind+2 != _argc) {
-    usage(_argv);
-    exit(EXIT_FAILURE);
   }
 
   /*  1  2  3  4  3
       2  4  6  8  6 || *2 (a a b b ...)
-      4  8 12 16 12 || *3 (sinc ...)*/
-  regression_init(regs + EDGE_FILTER_1_H, 4);
-  regression_init(regs + EDGE_FILTER_1_V, 4);
-  regression_init(regs + EDGE_FILTER_2_H, 8);
-  regression_init(regs + EDGE_FILTER_2_V, 8);
+      6 12 18 24 18 || *3 (sinc ...)
+      3  6  9 12  9 || /2 (symmetry)*/
+  regression_init(regs + EDGE_FILTER_1_H, 12);
+  regression_init(regs + EDGE_FILTER_1_V, 12);
+  regression_init(regs + EDGE_FILTER_2_H, 12);
+  regression_init(regs + EDGE_FILTER_2_V, 12);
   regression_init(regs + EDGE_FILTER_3_H, 12);
   regression_init(regs + EDGE_FILTER_3_V, 12);
-  regression_init(regs + EDGE_FILTER_4_H, 16);
-  regression_init(regs + EDGE_FILTER_4_V, 16);
+  regression_init(regs + EDGE_FILTER_4_H, 12);
+  regression_init(regs + EDGE_FILTER_4_V, 12);
   regression_init(regs + EDGE_FILTER_5_H, 12);
   regression_init(regs + EDGE_FILTER_5_V, 12);
   regression_init(regs + FALLBACK_FILTER_H, 3);
   regression_init(regs + FALLBACK_FILTER_V, 3);
 
   /* TODO: for argv < argc ... */
-  fin = strcmp(_argv[optind], "-") == 0 ? stdin : fopen(_argv[optind], "rb");
-  if (fin == NULL) {
-    fprintf(stderr, "Unable to open '%s' for extraction.\n", _argv[optind]);
-    exit(EXIT_FAILURE);
-  }
-  fprintf(stderr, "Opening %s as input...\n", _argv[optind]);
-  if (video_input_open(&vid1, fin) < 0) exit(EXIT_FAILURE);
-  video_input_get_info(&vid1, &info1);
-
-  daala_info_init(&info);
-  for (pli = 0; pli < 3; pli++) {
-    xdec[pli] = pli && !(info1.pixel_fmt&1);
-    ydec[pli] = pli && !(info1.pixel_fmt&2);
-    h[pli] = (info1.pic_h/2) >> ydec[pli];
-    w[pli] = (info1.pic_w/2) >> xdec[pli];
-
-    info.plane_info[pli].xdec = xdec[pli];
-    info.plane_info[pli].ydec = ydec[pli];
-  }
-  info.nplanes = 3;
-  info.pic_height = h[0];
-  info.pic_width = w[0];
-
-  od_state_init(&state, &info);
-
-  fout = strcmp(_argv[optind+1], "-") == 0 ? stdout : fopen(_argv[optind+1],
-   "wb");
-  if (fout == NULL) {
-    fprintf(stderr, "Error opening output file \"%s\".\n", _argv[optind+1]);
-    return 1;
-  }
-
-
-  fprintf(fout, "YUV4MPEG2 W%i H%i F%i:%i Ip A%i:%i%s\n",
-   w[0]*2, h[0]*2, (unsigned)info1.fps_n,
-   (unsigned)info1.fps_d, info1.par_n, info1.par_d,
-   CHROMA_TAGS[ydec[1] ? xdec[1] ? 0 : 2 : 3]);
-  for (frameno = 0;; frameno++) {
-    video_input_ycbcr in;
-    int             ret1 = 0;
-    char            tag1[5];
-    od_img *simg = &state.io_imgs[OD_FRAME_REC];
-    od_img *dimg = &state.ref_imgs[0];
-    int x, y;
-    if (!limit || frameno < limit) {
-      ret1 = video_input_fetch_frame(&vid1, in, tag1);
+  for (; optind < _argc; optind++) {
+    FILE *fin;
+    fin = strcmp(_argv[optind], "-") == 0 ? stdin : fopen(_argv[optind], "rb");
+    if (fin == NULL) {
+      fprintf(stderr, "Unable to open '%s' for extraction.\n", _argv[optind]);
+      return 1;
     }
-    if (ret1 == 0) break;
+    fprintf(stderr, "Opening %s as input...\n", _argv[optind]);
+    if (video_input_open(vid + input_files, fin) < 0) {
+      return 1;
+    }
+    input_files++;
+  }
+
+  for (i = 0; i < input_files; i++) {
+    FILE *out = fout[i];
+    video_input_info vid_info;
+    video_input_get_info(vid + i, &vid_info);
+    daala_info_init(&info);
     for (pli = 0; pli < 3; pli++) {
-      od_img_plane *siplane = simg->planes + pli;
-      unsigned char *src = siplane->data;
-      int src_stride = siplane->ystride;
-      int plane_width = simg->width >> xdec[pli];
-      int plane_height = simg->height >> ydec[pli];
-      for (y = 0; y < h[pli]; y++) {
-        for (x = 0; x < w[pli]; x++) {
-          int cy = 2*y + (info1.pic_y >> ydec[pli]);
-          int cx = 2*x + (info1.pic_x >> xdec[pli]);
-          src[y*src_stride + x] = in[pli].data[cy*in[pli].stride + cx];
-        }
+      xdec[pli] = pli && !(vid_info.pixel_fmt&1);
+      ydec[pli] = pli && !(vid_info.pixel_fmt&2);
+      h[pli] = (vid_info.pic_h/2) >> ydec[pli];
+      w[pli] = (vid_info.pic_w/2) >> xdec[pli];
+
+      info.plane_info[pli].xdec = xdec[pli];
+      info.plane_info[pli].ydec = ydec[pli];
+    }
+    info.nplanes = 3;
+    info.pic_height = h[0];
+    info.pic_width = w[0];
+
+    od_state_init(&state, &info);
+
+    if (out) {
+      fprintf(out, "YUV4MPEG2 W%i H%i F%i:%i Ip A%i:%i%s\n",
+       w[0]*2, h[0]*2, (unsigned)vid_info.fps_n,
+       (unsigned)vid_info.fps_d, vid_info.par_n, vid_info.par_d,
+       CHROMA_TAGS[ydec[1] ? xdec[1] ? 0 : 2 : 3]);
+    }
+    for (frameno = 0;; frameno++) {
+      video_input_ycbcr in;
+      int             ret1 = 0;
+      char            tag1[5];
+      od_img *simg = &state.io_imgs[OD_FRAME_REC];
+      od_img *dimg = &state.ref_imgs[0];
+      int x, y;
+      if (!limit || frameno < limit) {
+        ret1 = video_input_fetch_frame(vid + i, in, tag1);
       }
-      /*From od_img_plane_copy_pad8*/
-      /*Right side.*/
-      for (x = w[pli]; x < plane_width; x++) {
-        src = siplane->data + x - 1;
+      if (ret1 == 0) break;
+      for (pli = 0; pli < 3; pli++) {
+        od_img_plane *siplane = simg->planes + pli;
+        unsigned char *src = siplane->data;
+        int src_stride = siplane->ystride;
+        int plane_width = simg->width >> xdec[pli];
+        int plane_height = simg->height >> ydec[pli];
         for (y = 0; y < h[pli]; y++) {
-          src[1] = (2*src[0] + (src - (src_stride & -(y > 0)))[0]
-           + (src + (src_stride & -(y + 1 < h[pli])))[0] + 2) >> 2;
+          for (x = 0; x < w[pli]; x++) {
+            int cy = 2*y + (vid_info.pic_y >> ydec[pli]);
+            int cx = 2*x + (vid_info.pic_x >> xdec[pli]);
+            src[y*src_stride + x] = in[pli].data[cy*in[pli].stride + cx];
+          }
+        }
+        /*From od_img_plane_copy_pad8*/
+        /*Right side.*/
+        for (x = w[pli]; x < plane_width; x++) {
+          src = siplane->data + x - 1;
+          for (y = 0; y < h[pli]; y++) {
+            src[1] = (2*src[0] + (src - (src_stride & -(y > 0)))[0]
+             + (src + (src_stride & -(y + 1 < h[pli])))[0] + 2) >> 2;
+            src += src_stride;
+          }
+        }
+        /*Bottom.*/
+        src = siplane->data + src_stride*h[pli];
+        for (y = h[pli]; y < plane_height; y++) {
+          for (x = 0; x < plane_width; x++) {
+            src[x] = (2*(src - src_stride)[x] + (src - src_stride)[x - (x > 0)]
+             + (src - src_stride)[x + (x + 1 < plane_width)] + 2) >> 2;
+          }
           src += src_stride;
         }
       }
-      /*Bottom.*/
-      src = siplane->data + src_stride*h[pli];
-      for (y = h[pli]; y < plane_height; y++) {
-        for (x = 0; x < plane_width; x++) {
-          src[x] = (2*(src - src_stride)[x] + (src - src_stride)[x - (x > 0)]
-           + (src - src_stride)[x + (x + 1 < plane_width)] + 2) >> 2;
+      train_upsample(&state, dimg, simg, regs, in[0].data
+       + vid_info.pic_y*in[0].stride + vid_info.pic_x, in[0].stride);
+      if (out) {
+        fprintf(out, "FRAME\n");
+        for (pli = 0; pli < 3; pli++) {
+          od_img_plane *diplane = dimg->planes + pli;
+          unsigned char *dst = diplane->data;
+          for (y = 0; y < 2*h[pli]; y++) {
+            if (fwrite(dst + diplane->ystride*y, 2*w[pli], 1, out) < 1) {
+              fprintf(stderr, "Error writing to output.\n");
+              return EXIT_FAILURE;
+            }
+          }
         }
-        src += src_stride;
       }
     }
-    train_upsample(&state, dimg, simg, regs, in[0].data + info1.pic_y*in[0].stride + info1.pic_x,
-                   in[0].stride);
-    fprintf(fout, "FRAME\n");
-    for (pli = 0; pli < 3; pli++) {
-      od_img_plane *diplane = dimg->planes + pli;
-      unsigned char *dst = diplane->data;
-      for (y = 0; y < 2*h[pli]; y++) {
-        if (fwrite(dst + diplane->ystride*y, 2*w[pli], 1, fout) < 1) {
-          fprintf(stderr, "Error writing to output.\n");
-          return EXIT_FAILURE;
-        }
-      }
+    video_input_close(vid + i);
+    if (out && out != stdout) {
+      fclose(out);
     }
   }
   regression_solve(regs + FALLBACK_FILTER_H);
-  /*regression_solve(regs + FALLBACK_FILTER_V);*/
-  video_input_close(&vid1);
-  /*regression_solve(&reg);*/
-  if (fout != stdout) fclose(fout);
+  regression_solve(regs + EDGE_FILTER_1_H);
   return EXIT_SUCCESS;
 }
