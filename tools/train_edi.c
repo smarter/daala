@@ -55,23 +55,7 @@ static void usage(char **_argv) {
 
 static const char *CHROMA_TAGS[4] = { " C420jpeg", "", " C422jpeg", " C444" };
 
-#define MAX_TAPS 16
-
-enum filters {
-  EDGE_FILTER_1_H = 0,
-  EDGE_FILTER_1_V,
-  EDGE_FILTER_2_H,
-  EDGE_FILTER_2_V,
-  EDGE_FILTER_3_H,
-  EDGE_FILTER_3_V,
-  EDGE_FILTER_4_H,
-  EDGE_FILTER_4_V,
-  EDGE_FILTER_5_H,
-  EDGE_FILTER_5_V,
-  FALLBACK_FILTER_H,
-  FALLBACK_FILTER_V,
-  FILTERS_MAX
-};
+#define MAX_TAPS 24
 
 struct filter_regression {
   int taps;
@@ -81,11 +65,13 @@ struct filter_regression {
   int length;
 };
 
+#define SYMMETRIC_TAPS 0
+
 static void regression_init(struct filter_regression *reg, int taps) {
   int i;
   int length = 1024*1024;
   reg->taps = taps;
-  for (i = 0; i < taps; i++) {
+  for (i = 0; i < taps - 1; i++) {
     reg->pred_col[i] = calloc(length, sizeof(**reg->pred_col));
   }
   reg->resp = calloc(length, sizeof(*reg->resp));
@@ -93,7 +79,6 @@ static void regression_init(struct filter_regression *reg, int taps) {
   reg->length = 0;
 }
 
-#define NEW 1
 static void regression_add_resp(struct filter_regression *reg, int value) {
   int i;
   reg->length++;
@@ -108,7 +93,7 @@ static void regression_add_resp(struct filter_regression *reg, int value) {
     memset(reg->resp + (reg->allocated_length/2), 0,
      (reg->allocated_length/2)*sizeof(*reg->resp));
   }
-#if NEW
+#if SYMMETRIC_TAPS
   reg->resp[reg->length - 1] = 2*value;
 #else
   reg->resp[reg->length - 1] = value;
@@ -116,12 +101,11 @@ static void regression_add_resp(struct filter_regression *reg, int value) {
 }
 static void regression_set_tap(struct filter_regression *reg, int tap, int value) {
 #if 1
-  if (NEW && tap == reg->taps - 1) {
+  if (tap == reg->taps - 1) {
     int i;
     for (i = 0; i < reg->taps - 1; i++) {
       reg->pred_col[i][reg->length - 1] -= value;
     }
-    reg->pred_col[tap][reg->length - 1] = value;
     reg->resp[reg->length - 1] -= value;
   } else {
     reg->pred_col[tap][reg->length - 1] += value;
@@ -141,13 +125,8 @@ static void regression_set_tap(struct filter_regression *reg, int tap, int value
 #define DEBUG_PRINT 0
 static void regression_solve(struct filter_regression *reg) {
   int m = reg->length;
-#if NEW
   int n = reg->taps - 1;
   double coeffs_sum = 0;
-#else
-  int n = reg->taps;
-  double tap_sum = 0;
-#endif
   double *sol;
   double *mat;
   double d[MAX_TAPS - 1];
@@ -156,16 +135,22 @@ static void regression_solve(struct filter_regression *reg) {
   int rank;
   int i, j;
   sol = malloc(m*sizeof(*sol));
+#if DEBUG_PRINT
   printf("y = [ ");
+#endif
   for (i = 0; i < m; i++) {
     sol[i] = reg->resp[i];
 #if DEBUG_PRINT
     printf("%f ", sol[i]);
 #endif
   }
+#if DEBUG_PRINT
   printf("].';\n");
+#endif
   mat = malloc(m*n*sizeof(*mat));
+#if DEBUG_PRINT
   printf("x = [ ");
+#endif
   for (i = 0; i < n; i++) {
     for (j = 0; j < m; j++) {
       mat[i*m + j] = reg->pred_col[i][j];
@@ -173,9 +158,13 @@ static void regression_solve(struct filter_regression *reg) {
       printf("%d ", reg->pred_col[i][j]);
 #endif
     }
+#if DEBUG_PRINT
     printf(";");
+#endif
   }
+#if DEBUG_PRINT
   printf(" ].';\n");
+#endif
   rank = qrdecomp_hh(mat, m, d, NULL, 0, NULL, n, m);
   if (rank != n) {
     fprintf(stderr, "rank (%d) != n (%d)\n", rank, n);
@@ -184,10 +173,17 @@ static void regression_solve(struct filter_regression *reg) {
   qrsolve_hh(mat, m, d, sol, m, n, m, 1);
 
   printf("[");
-#if NEW
+#if SYMMETRIC_TAPS
   coeffs[reg->taps - 1] = 0.5;
+#else
+  coeffs[reg->taps - 1] = 1.0;
+#endif
   for (i = 0; i < reg->taps - 1; i++) {
+#if SYMMETRIC_TAPS
     coeffs[i] = sol[i]/2;
+#else
+    coeffs[i] = sol[i];
+#endif
     coeffs[reg->taps - 1] -= coeffs[i];
     coeffs_sum += coeffs[i];
   }
@@ -206,27 +202,19 @@ static void regression_solve(struct filter_regression *reg) {
         max_i = i;
       }
     }
+#if SYMMETRIC_TAPS
     rounded_coeffs[max_i] += total/2 - sum;
+#else
+    rounded_coeffs[max_i] += total - sum;
+#endif
     for (i = 0; i < reg->taps; i++) {
       printf("%d, ", rounded_coeffs[i]);
     }
     printf("\n");
   }
-#else
-  for (i = 0; i < reg->taps; i++) {
-    printf(" %f", sol[i]);
-    tap_sum += sol[i];
-  }
-  printf(" ] sum: %f\n", tap_sum);
-#endif
 #if 0
   for (j = 0; j < m; j++) {
-    /*printf("%d %f\n", reg->resp[j], sol[0]*reg->pred_col[0][j] + sol[1]*reg->pred_col[1][j] + (1 - tap_sum)*reg->pred_col[2][j]);*/
-#if NEW
     printf("%d %f\n", reg->resp[j], sol[0]*reg->pred_col[0][j] + sol[1]*reg->pred_col[1][j]);
-#else
-    printf("%d %f\n", reg->resp[j], sol[0]*reg->pred_col[0][j] + sol[1]*reg->pred_col[1][j] + sol[2]*reg->pred_col[2][j]);
-#endif
   }
 #endif
 }
@@ -255,43 +243,24 @@ static int taps3(const unsigned char *s, int stride, int t1, int t2, int t3) {
   return t1*s[0] + t2*s[1*stride] + t3*s[2*stride];
 }
 
-#define THREE_TAPS 0
-
 static int reconstruct_v2(const unsigned char *s, int xstride, int ystride,
- struct filter_regression *r,
- int a1, int a2, int a3, int b1, int b2, int b3, int c1, int c2, int c3,
- int d1, int d2, int d3)
-{
-  int x;
-
-#if THREE_TAPS
-  regression_set_tap(r, 0, s[-0*ystride] + s[0*ystride + xstride]);
-  regression_set_tap(r, 1, s[-0*ystride - xstride] + s[0*ystride + 2*xstride]);
-  regression_set_tap(r, 2, s[-0*ystride - 2*xstride] + s[0*ystride + 3*xstride]);
-#else
-  regression_set_tap(r, 0, s[-3*ystride] + s[3*ystride + xstride]);
-  regression_set_tap(r, 1, s[-3*ystride - xstride] + s[3*ystride + 2*xstride]);
-  regression_set_tap(r, 2, s[-3*ystride - 2*xstride] + s[3*ystride + 3*xstride]);
-  regression_set_tap(r, 3, s[-2*ystride] + s[2*ystride + xstride]);
-  regression_set_tap(r, 4, s[-2*ystride - xstride] + s[2*ystride + 2*xstride]);
-  regression_set_tap(r, 5, s[-2*ystride - 2*xstride] + s[2*ystride + 3*xstride]);
-  regression_set_tap(r, 6, s[-1*ystride] + s[1*ystride + xstride]);
-  regression_set_tap(r, 7, s[-1*ystride - xstride] + s[1*ystride + 2*xstride]);
-  regression_set_tap(r, 8, s[-1*ystride - 2*xstride] + s[1*ystride + 3*xstride]);
-  regression_set_tap(r, 9, s[-0*ystride] + s[0*ystride + xstride]);
-  regression_set_tap(r, 10, s[-0*ystride - xstride] + s[0*ystride + 2*xstride]);
-  regression_set_tap(r, 11, s[-0*ystride - 2*xstride] + s[0*ystride + 3*xstride]);
-#endif
-
-  x = taps3(s - 3*ystride, -xstride, a1, a2, a3);
-  x += taps3(s - 2*ystride, -xstride, b1, b2, b3);
-  x += taps3(s - 1*ystride, -xstride, c1, c2, c3);
-  x += taps3(s - 0*ystride, -xstride, d1, d2, d3);
-  x += taps3(s + 0*ystride + xstride, xstride, d1, d2, d3);
-  x += taps3(s + 1*ystride + xstride, xstride, c1, c2, c3);
-  x += taps3(s + 2*ystride + xstride, xstride, b1, b2, b3);
-  x += taps3(s + 3*ystride + xstride, xstride, a1, a2, a3);
-  return (x + 512) >> 10;
+ struct filter_regression *r, int *coeffs) {
+  int rec = 0;
+  int tap = 0;
+  int ys[8] = { -3, -2, -1, -0, 0, 1, 2, 3 };
+  int i;
+  for (i = 0; i < 8; i++) {
+    int y = ys[i];
+    int xstart = i < 4 ? 0 : 3;
+    int x;
+    for (x = xstart; x > xstart - 3; x--) {
+      int val = s[y*ystride + x*xstride];
+      regression_set_tap(r, tap, val);
+      rec += coeffs[tap]*val;
+      tap++;
+    }
+  }
+  return (rec + 512) >> 10;
 }
 
 static int reconstruct_h(const unsigned char *s, int xstride, int ystride,
@@ -411,7 +380,7 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
         }
 
         if (abs(dx) <= 4 * abs(dx2)) {
-          struct filter_regression *r = regs + FALLBACK_FILTER_H;
+          struct filter_regression *r = regs + 0;
 #if ORIGINAL_FILTERS
           v = (20*(d[x] + d[x + 2])
                - 5*(d[x - 2] + d[x + 4]) + d[x - 4] + d[x + 6] + 16) >> 5;
@@ -423,44 +392,104 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
           regression_set_tap(r, 0, d[x - 4] + d[x + 6]);
           regression_set_tap(r, 1, d[x - 2] + d[x + 4]);
           regression_set_tap(r, 2, d[x] + d[x + 2]);
-        } else if (dx < 0) {
-          if (dx < -2 * dy) {
-            struct filter_regression *r = regs + EDGE_FILTER_1_H;
-            regression_add_resp(r , up_ref[2*y*up_ref_stride + (x + 1)]);
-#if ORIGINAL_FILTERS
-            v = reconstruct_v2(d + x, 2, 2*dst_stride, r,
-             0, 0, 0,   0, 0, 0,    0, 0, 0,    20*32, -5*32, 1*32);
-#else
-            v = reconstruct_v2(d + x, 2, 2*dst_stride, r,
-                               43, 16, 51, -31, -12, 62, -14, 85, -76, 555, -148, -19); /* foreman_300 */
-            /*21, 8, 26, -16, -6, 31, -7, 43, -38, 277, -74, -9);*/ /* foreman_300 */
-            /*0, 0, 0,   0, 0, 0,    0, 0, 0,    320, -73, 9);*/ /* foreman_300 */
-            /*0, 0, 0,   0, 0, 0,    0, 0, 0,    281, -25, 0);*/ /*bus_cif_2f*/
-            /*18, 6, 21, -15, -3, 21, 11, -3, -0, 258, -34, -24);*/ /*bus_cif_2f*/
-            /*0, 0, 0,   0, 0, 0,    0, 0, 0,    312, -69, 13);*/
-            /*22, 8, 26, -15, -7, 33, -6, 39, -38, 270, -70, -6);*/
-#endif
-          } else if (dx < -dy) {
-            v = reconstruct_v(d + x, 2, 2*dst_stride, 0, 0, 8, 8);
-          } else if (2 * dx < -dy) {
-            v = reconstruct_v(d + x, 2, 2*dst_stride, 0, 4, 8, 4);
-          } else if (3 * dx < -dy) {
-            v = reconstruct_v(d + x, 2, 2*dst_stride, 1, 7, 7, 1);
-          } else {
-            v = reconstruct_v(d + x, 2, 2*dst_stride, 4, 8, 4, 0);
-          }
         } else {
-          if (dx > 2 * dy) {
-            v = reconstruct_v(d + x, 2, -2*dst_stride, 0, 0, 0, 16);
-          } else if (dx > dy) {
-            v = reconstruct_v(d + x, 2, -2*dst_stride, 0, 0, 8, 8);
-          } else if (2 * dx > dy) {
-            v = reconstruct_v(d + x, 2, -2*dst_stride, 0, 4, 8, 4);
-          } else if (3 * dx > dy) {
-            v = reconstruct_v(d + x, 2, -2*dst_stride, 1, 7, 7, 1);
+#if ORIGINAL_FILTERS
+          int coeffs_table[10][24] = {
+            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 20*32, -5*32, 1*32,
+              1*32, -5*32, 20*32, 0, 0, 00, 0, 00, 0, 0},
+            { 0, 0, 0, 0, 0, 0, 20*16, -5*16, 1*16, 20*16, -5*16, 1*16,
+              1*16, -5*16, 20*16, 1*16, -5*16, 20*16, 0, 0, 0, 0, 0, 0},
+            { 0, 0, 0, 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8,
+              1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8, 0, 0, 0},
+            { 20*2, -5*2, 1*2, 20*14, -5*14, 1*14, 20*14, -5*14, 1*14, 20*2, -5*2, 1*2,
+              1*2, -5*2, 20*2, 1*14, -5*14, 20*14, 1*14, -5*14, 20*14, 1*2, -5*2, 20*2},
+            { 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8, 0, 0, 0,
+              0, 0, 0, 1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8},
+            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 20*32, -5*32, 1*32,
+              1*32, -5*32, 20*32, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            { 0, 0, 0, 0, 0, 0, 20*16, -5*16, 1*16, 20*16, -5*16, 1*16,
+              1*16, -5*16, 20*16, 1*16, -5*16, 20*16, 0, 0, 0, 0, 0, 0},
+            { 0, 0, 0, 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8,
+              1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8, 0, 0, 0},
+            { 20*2, -5*2, 1*2, 20*14, -5*14, 1*14, 20*14, -5*14, 1*14, 20*2, -5*2, 1*2,
+              1*2, -5*2, 20*2, 1*14, -5*14, 20*14, 1*14, -5*14, 20*14, 1*2, -5*2, 20*2},
+            { 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8, 0, 0, 0,
+              0, 0, 0, 1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8}
+          };
+#else
+          int coeffs_table[10][24] = {
+            { 0, 0, 0,  0, 0, 0,    0, 0, 0,    640, -146, 18,
+              18, -146, 640,  0, 0, 0,  0, 0, 0,    0, 0, 0 },
+#if 0
+            { 43, 16, 51, -31, -12, 62, -14, 85, -76, 555, -148, -19,
+              -19, -148, 555, -76, 85, -14, 62, -12, -31, 51, 16, 43 },
+#endif
+#if 0
+            { 92, 30, 65, -56, 31, 39, 80, 75, -74, 839, -133, 30,
+              -44, -137, 353, -72, 75, -153, 70, -61, -6, -2, 0, -17 },
+#endif
+            { 0, 0, 0, 0, 0, 0, 20*16, -5*16, 1*16, 20*16, -5*16, 1*16,
+              1*16, -5*16, 20*16, 1*16, -5*16, 20*16, 0, 0, 0, 0, 0, 0},
+            { 0, 0, 0, 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8,
+              1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8, 0, 0, 0},
+            { 20*2, -5*2, 1*2, 20*14, -5*14, 1*14, 20*14, -5*14, 1*14, 20*2, -5*2, 1*2,
+              1*2, -5*2, 20*2, 1*14, -5*14, 20*14, 1*14, -5*14, 20*14, 1*2, -5*2, 20*2},
+            { 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8, 0, 0, 0,
+              0, 0, 0, 1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8},
+            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 20*32, -5*32, 1*32,
+              1*32, -5*32, 20*32, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            { 0, 0, 0, 0, 0, 0, 20*16, -5*16, 1*16, 20*16, -5*16, 1*16,
+              1*16, -5*16, 20*16, 1*16, -5*16, 20*16, 0, 0, 0, 0, 0, 0},
+            { 0, 0, 0, 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8,
+              1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8, 0, 0, 0},
+            { 20*2, -5*2, 1*2, 20*14, -5*14, 1*14, 20*14, -5*14, 1*14, 20*2, -5*2, 1*2,
+              1*2, -5*2, 20*2, 1*14, -5*14, 20*14, 1*14, -5*14, 20*14, 1*2, -5*2, 20*2},
+            { 20*8, -5*8, 1*8, 20*16, -5*16, 1*16, 20*8, -5*8, 1*8, 0, 0, 0,
+              0, 0, 0, 1*8, -5*8, 20*8, 1*16, -5*16, 20*16, 1*8, -5*8, 20*8}
+          };
+#endif
+          struct filter_regression *r;
+          int *coeffs;
+          int ystride;
+          if (dx < 0) {
+            ystride = 2*dst_stride;
+            if (dx < -2 * dy) {
+              r = regs + 2;
+              coeffs = coeffs_table[0];
+            } else if (dx < -dy) {
+              r = regs + 3;
+              coeffs = coeffs_table[1];
+            } else if (2 * dx < -dy) {
+              r = regs + 4;
+              coeffs = coeffs_table[2];
+            } else if (3 * dx < -dy) {
+              r = regs + 5;
+              coeffs = coeffs_table[3];
+            } else {
+              r = regs + 6;
+              coeffs = coeffs_table[4];
+            }
           } else {
-            v = reconstruct_v(d + x, 2, -2*dst_stride, 4, 8, 4, 0);
+            ystride = -2*dst_stride;
+            if (dx > 2 * dy) {
+              r = regs + 7;
+              coeffs = coeffs_table[5];
+            } else if (dx > dy) {
+              r = regs + 8;
+              coeffs = coeffs_table[6];
+            } else if (2 * dx > dy) {
+              r = regs + 9;
+              coeffs = coeffs_table[7];
+            } else if (3 * dx > dy) {
+              r = regs + 10;
+              coeffs = coeffs_table[8];
+            } else {
+              r = regs + 11;
+              coeffs = coeffs_table[9];
+            }
           }
+          regression_add_resp(r, up_ref[2*y*up_ref_stride + (x + 1)]);
+          v = reconstruct_v2(d + x, 2, ystride, r, coeffs);
         }
         d[x + 1] = OD_CLAMP255(v);
       }
@@ -511,7 +540,7 @@ static void train_upsample(od_state *state, od_img *dimg, const od_img *simg,
           }
 
           if (abs(dx) <= 4*abs(dx2)) {
-            struct filter_regression *r = regs + FALLBACK_FILTER_V;
+            struct filter_regression *r = regs + 1;
 #if 1 || ORIGINAL_FILTERS
             v = (20*(d0[x] + d2[x])
              - 5*(dm2[x] + d4[x]) + dm4[x] + d6[x] + 16) >> 5;
@@ -699,7 +728,7 @@ int main(int _argc, char **_argv) {
   int c;
   od_state state;
   daala_info info;
-  struct filter_regression regs[FILTERS_MAX];
+  struct filter_regression regs[100];
   int i;
 
   limit = 0;
@@ -727,28 +756,13 @@ int main(int _argc, char **_argv) {
     }
   }
 
-  /*  1  2  3  4  3
-      2  4  6  8  6 || *2 (a a b b ...)
-      6 12 18 24 18 || *3 (sinc ...)
-      3  6  9 12  9 || /2 (symmetry)*/
-#if THREE_TAPS
-  regression_init(regs + EDGE_FILTER_1_H, 3);
-#else
-  regression_init(regs + EDGE_FILTER_1_H, 12);
-#endif
-  regression_init(regs + EDGE_FILTER_1_V, 12);
-  regression_init(regs + EDGE_FILTER_2_H, 12);
-  regression_init(regs + EDGE_FILTER_2_V, 12);
-  regression_init(regs + EDGE_FILTER_3_H, 12);
-  regression_init(regs + EDGE_FILTER_3_V, 12);
-  regression_init(regs + EDGE_FILTER_4_H, 12);
-  regression_init(regs + EDGE_FILTER_4_V, 12);
-  regression_init(regs + EDGE_FILTER_5_H, 12);
-  regression_init(regs + EDGE_FILTER_5_V, 12);
-  regression_init(regs + FALLBACK_FILTER_H, 3);
-  regression_init(regs + FALLBACK_FILTER_V, 3);
+  for (i = 0; i < 2; i++) {
+    regression_init(regs + i, 3);
+  }
+  for (; i < 50; i++) {
+    regression_init(regs + i, 24);
+  }
 
-  /* TODO: for argv < argc ... */
   for (; optind < _argc; optind++) {
     FILE *fin;
     fin = strcmp(_argv[optind], "-") == 0 ? stdin : fopen(_argv[optind], "rb");
@@ -854,7 +868,7 @@ int main(int _argc, char **_argv) {
       fclose(out);
     }
   }
-  /*regression_solve(regs + FALLBACK_FILTER_H);*/
-  regression_solve(regs + EDGE_FILTER_1_H);
+  /*regression_solve(regs + 0);*/
+  regression_solve(regs + 2);
   return EXIT_SUCCESS;
 }
