@@ -1850,7 +1850,7 @@ static int od_mv_est_bits(od_mv_est_ctx *est, int equal_mvs,
   return cost;
 }
 
-/*Computes the SAD of a whole-pel BMA block with the given parameters.*/
+/*Computes the SAD of a half-pel BMA block with the given parameters.*/
 static ogg_int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
  int ref, int bx, int by, int mvx, int mvy, int log_mvb_sz) {
   od_state *state;
@@ -1866,8 +1866,8 @@ static ogg_int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
   state = &est->enc->state;
   refi = state->ref_imgi[ref];
   iplane = state->ref_imgs[refi].planes + 0;
-  pmvx = OD_DIV_POW2_RE(mvx << 1, iplane->xdec);
-  pmvy = OD_DIV_POW2_RE(mvy << 1, iplane->ydec);
+  pmvx = OD_DIV_POW2_RE(mvx, iplane->xdec);
+  pmvy = OD_DIV_POW2_RE(mvy, iplane->ydec);
   pbx = (bx + (1 << iplane->xdec) - 1) & ~((1 << iplane->xdec) - 1);
   pby = (by + (1 << iplane->ydec) - 1) & ~((1 << iplane->ydec) - 1);
   dx = (pbx << 1 >> iplane->xdec) + pmvx;
@@ -1878,8 +1878,8 @@ static ogg_int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
     int pli;
     for (pli = 1; pli < state->io_imgs[OD_FRAME_INPUT].nplanes; pli++) {
       iplane = state->ref_imgs[refi].planes + pli;
-      pmvx = OD_DIV_POW2_RE(mvx << 1, iplane->xdec);
-      pmvy = OD_DIV_POW2_RE(mvy << 1, iplane->ydec);
+      pmvx = OD_DIV_POW2_RE(mvx, iplane->xdec);
+      pmvy = OD_DIV_POW2_RE(mvy, iplane->ydec);
       pbx = (bx + (1 << iplane->xdec) - 1) & ~((1 << iplane->xdec) - 1);
       pby = (by + (1 << iplane->ydec) - 1) & ~((1 << iplane->ydec) - 1);
       dx = (pbx << 1 >> iplane->xdec) + pmvx;
@@ -2238,7 +2238,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
      x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
   }
 #endif
-  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1,
+   log_mvb_sz);
   best_rate = od_mv_est_bits(est, equal_mvs,
    candx << 1, candy << 1, predx, predy);
   best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
@@ -2294,7 +2295,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
          x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
       }
 #endif
-      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1,
+       log_mvb_sz);
       rate = od_mv_est_bits(est, equal_mvs,
        candx << 1, candy << 1, predx, predy);
       cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2341,7 +2343,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
            x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
         }
 #endif
-        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1,
+         log_mvb_sz);
         rate = od_mv_est_bits(est, equal_mvs,
          candx << 1, candy << 1, predx, predy);
         cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2401,7 +2404,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
             }
 #endif
             sad = od_mv_est_bma_sad8(est,
-             ref, bx, by, candx, candy, log_mvb_sz);
+             ref, bx, by, candx << 1, candy << 1, log_mvb_sz);
             rate = od_mv_est_bits(est, equal_mvs,
              candx << 1, candy << 1, predx, predy);
             cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
