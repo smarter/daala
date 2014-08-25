@@ -43,7 +43,7 @@ typedef ogg_uint16_t od_sad4[4];
   Other pieces correspond to a block whose upper-left corner is located at that
    vertex.*/
 struct od_mv_node {
-  /*The historical motion vectors for EPZS^2, stored at full-pel resolution.
+  /*The historical motion vectors for EPZS^2, stored at half-pel resolution.
     Indexed by [time][reference_type][component].*/
   int bma_mvs[3][2][2];
   /*The current estimated rate of this MV.*/
@@ -165,7 +165,7 @@ struct od_mv_est_ctx {
   ogg_int32_t mvapw[2][2];
   /*Flags indicating which MVs have already been tested during the initial
      EPZS^2 pass.*/
-  unsigned char hit_cache[64][64];
+  unsigned char hit_cache[128][128];
   /*The flag used by the current EPZS search iteration.*/
   unsigned hit_bit;
   /*The Lagrangian multiplier used for R-D optimization.*/
