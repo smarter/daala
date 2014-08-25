@@ -1775,12 +1775,12 @@ static void od_mv_est_clear_hit_cache(od_mv_est_ctx *est) {
 
 /*Test if a motion vector has been examined.*/
 static int od_mv_est_is_hit(od_mv_est_ctx *est, int mvx, int mvy) {
-  return est->hit_cache[mvy + 32][mvx + 32] == est->hit_bit;
+  return est->hit_cache[mvy + 64][mvx + 64] == est->hit_bit;
 }
 
 /*Mark a motion vector examined.*/
 static void od_mv_est_set_hit(od_mv_est_ctx *est, int mvx, int mvy) {
-  est->hit_cache[mvy + 32][mvx + 32] = (unsigned char)est->hit_bit;
+  est->hit_cache[mvy + 64][mvx + 64] = (unsigned char)est->hit_bit;
 }
 
 /*Estimated rate (in units of OD_BITRES) of the >=3 part of a MV component of a
@@ -2135,6 +2135,13 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   mvymin = OD_MAXI(bymin - 32, -OD_UMV_PADDING) - bymin;
   bymax = OD_MINI(by + (mvb_sz << OD_LOG_MVBSIZE_MIN), state->frame_height);
   mvymax = OD_MINI(bymax + 31, state->frame_height + OD_UMV_PADDING) - bymax;
+
+  // Halfpel-ize
+  mvxmin *= 2;
+  mvxmax *= 2;
+  mvymin *= 2;
+  mvymax *= 2;
+
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "(%i, %i): Search range: [%i, %i]x[%i, %i]",
    bx, by, mvxmin, mvymin, mvxmax, mvymax));
@@ -2194,6 +2201,11 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     a[ci][1] = cneighbors[ci]->bma_mvs[0][ref][1];
     cands[ci][0] = OD_CLAMPI(mvxmin, a[ci][0], mvxmax);
     cands[ci][1] = OD_CLAMPI(mvymin, a[ci][1], mvymax);
+
+    OD_ASSERT((a[ci][0] & 1) == 0);
+    OD_ASSERT((a[ci][1] & 1) == 0);
+    OD_ASSERT((cands[ci][0] & 1) == 0);
+    OD_ASSERT((cands[ci][1] & 1) == 0);
   }
   /*Compute the median predictor:*/
   if (ncns > 3) {
@@ -2206,10 +2218,12 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     OD_SORT2I(a[0][1], a[2][1]);
     OD_SORT2I(a[1][0], a[3][0]);
     OD_SORT2I(a[1][1], a[3][1]);
-    predx = a[1][0] + a[2][0];
-    predy = a[1][1] + a[2][1];
-    candx = OD_CLAMPI(mvxmin, OD_DIV2_RE(predx), mvxmax);
-    candy = OD_CLAMPI(mvymin, OD_DIV2_RE(predy), mvymax);
+    predx = OD_DIV2(a[1][0]) + OD_DIV2(a[2][0]);
+    predy = OD_DIV2(a[1][1]) + OD_DIV2(a[2][1]);
+    candx = OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(predx), mvxmax);
+    candy = OD_CLAMPI(mvymin, 2*OD_DIV2_RE(predy), mvymax);
+    OD_ASSERT((candx & 1) == 0);
+    OD_ASSERT((candy & 1) == 0);
   }
   else {
     /*Median-of-3.*/
@@ -2219,10 +2233,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     OD_SORT2I(a[1][1], a[2][1]);
     OD_SORT2I(a[0][0], a[1][0]);
     OD_SORT2I(a[0][1], a[1][1]);
-    predx = a[1][0] << 1;
-    predy = a[1][1] << 1;
-    candx = OD_CLAMPI(mvxmin, a[1][0], mvxmax);
-    candy = OD_CLAMPI(mvymin, a[1][1], mvymax);
+    predx = a[1][0];
+    predy = a[1][1];
+    candx = OD_CLAMPI(mvxmin, predx, mvxmax);
+    candy = OD_CLAMPI(mvymin, predy, mvymax);
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
@@ -2235,19 +2249,21 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
   if (animating) {
     od_img_draw_line(&state->vis_img, x0, y0,
-     x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
+     x0 + candx, y0 + candy, OD_YCbCr_MVCAND);
   }
 #endif
-  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1,
+  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy,
    log_mvb_sz);
   best_rate = od_mv_est_bits(est, equal_mvs,
-   candx << 1, candy << 1, predx, predy);
+   candx, candy, predx, predy);
   best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Median predictor: (%i, %i)   Cost: %i", candx, candy, best_cost));
   od_mv_est_set_hit(est, candx, candy);
   best_vec[0] = candx;
   best_vec[1] = candy;
+  OD_ASSERT((best_vec[0] & 1) == 0);
+  OD_ASSERT((best_vec[1] & 1) == 0);
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Threshold: %i", est->thresh1[log_mvb_sz]));
   if (best_sad > est->thresh1[log_mvb_sz]) {
@@ -2283,6 +2299,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     for (ci = 0; ci < ncns; ci++) {
       candx = cands[ci][0];
       candy = cands[ci][1];
+      OD_ASSERT((candx & 1) == 0);
+      OD_ASSERT((candy & 1) == 0);
       if (od_mv_est_is_hit(est, candx, candy)) {
         OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
          "Set B predictor %i: (%i, %i) ...Skipping.", ci, candx, candy));
@@ -2292,13 +2310,12 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
       if (animating) {
         od_img_draw_line(&state->vis_img, x0, y0,
-         x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
+         x0 + candx, y0 + candy, OD_YCbCr_MVCAND);
       }
 #endif
-      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1,
+      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy,
        log_mvb_sz);
-      rate = od_mv_est_bits(est, equal_mvs,
-       candx << 1, candy << 1, predx, predy);
+      rate = od_mv_est_bits(est, equal_mvs, candx, candy, predx, predy);
       cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
       OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
        "Set B predictor %i: (%i, %i)    Cost: %i", ci, candx, candy, cost));
@@ -2310,6 +2327,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
         best_vec[1] = candy;
       }
     }
+    OD_ASSERT((best_vec[0] & 1) == 0);
+    OD_ASSERT((best_vec[1] & 1) == 0);
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG, "Threshold: %i", t2));
     if (best_sad > t2) {
       /*Constant velocity predictors from the previous frame:*/
@@ -2318,6 +2337,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
          OD_CLAMPI(mvxmin, pneighbors[ci]->bma_mvs[1][ref][0], mvxmax);
         cands[ci][1] =
          OD_CLAMPI(mvymin, pneighbors[ci]->bma_mvs[1][ref][1], mvymax);
+        OD_ASSERT((pneighbors[ci]->bma_mvs[1][ref][0] & 1) == 0);
+        OD_ASSERT((pneighbors[ci]->bma_mvs[1][ref][1] & 1) == 0);
       }
       /*The constant acceleration predictor:*/
       cands[4][0] = OD_CLAMPI(mvxmin,
@@ -2326,6 +2347,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       cands[4][1] = OD_CLAMPI(mvymin,
        OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
        - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 16, 0x8000), mvymax);
+      OD_ASSERT((mv->bma_mvs[1][ref][0] & 1) == 0);
+      OD_ASSERT((mv->bma_mvs[2][ref][0] & 1) == 0);
+      OD_ASSERT((mv->bma_mvs[1][ref][1] & 1) == 0);
+      OD_ASSERT((mv->bma_mvs[2][ref][1] & 1) == 0);
       /*Examine the candidates in Set C.*/
       for (ci = 0; ci < 5; ci++) {
         candx = cands[ci][0];
@@ -2335,18 +2360,19 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
            "Set C predictor %i: (%i, %i) ...Skipping.", ci, candx, candy));
           continue;
         }
+        OD_ASSERT((candx & 1) == 0);
+        OD_ASSERT((candy & 1) == 0);
         /*if (od_mv_est_is_hit(est, candx, candy)) continue;*/
         od_mv_est_set_hit(est, candx, candy);
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
         if (animating) {
           od_img_draw_line(&state->vis_img, x0, y0,
-           x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
+           x0 + candx, y0 + candy, OD_YCbCr_MVCAND);
         }
 #endif
-        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1,
+        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy,
          log_mvb_sz);
-        rate = od_mv_est_bits(est, equal_mvs,
-         candx << 1, candy << 1, predx, predy);
+        rate = od_mv_est_bits(est, equal_mvs, candx, candy, predx, predy);
         cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
         OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
          "Set C predictor %i: (%i, %i)    Cost: %i", ci, candx, candy, cost));
@@ -2358,6 +2384,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
           best_vec[1] = candy;
         }
       }
+      OD_ASSERT((best_vec[0] & 1) == 0);
+      OD_ASSERT((best_vec[1] & 1) == 0);
       /*Use the same threshold for Set C as in Set B.*/
       OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG, "Threshold: %i", t2));
       if (best_sad > t2) {
@@ -2378,8 +2406,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
           nsites = OD_SEARCH_NSITES[mvstate][b];
           for (sitei = 0; sitei < nsites; sitei++) {
             site = pattern[sitei];
-            candx = best_vec[0] + OD_SITE_DX[site];
-            candy = best_vec[1] + OD_SITE_DY[site];
+            candx = best_vec[0] + 2*OD_SITE_DX[site];
+            candy = best_vec[1] + 2*OD_SITE_DY[site];
+            OD_ASSERT((candx & 1) == 0);
+            OD_ASSERT((candy & 1) == 0);
             /*For the large search patterns, our simple mechanism to move
                bounds checking out of the inner loop doesn't work (it would
                need 2 more bits, or 4 times as much table storage, and require
@@ -2400,13 +2430,13 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
             if (animating) {
               od_img_draw_line(&state->vis_img, x0, y0,
-               x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
+               x0 + candx, y0 + candy, OD_YCbCr_MVCAND);
             }
 #endif
             sad = od_mv_est_bma_sad8(est,
-             ref, bx, by, candx << 1, candy << 1, log_mvb_sz);
+             ref, bx, by, candx, candy, log_mvb_sz);
             rate = od_mv_est_bits(est, equal_mvs,
-             candx << 1, candy << 1, predx, predy);
+             candx, candy, predx, predy);
             cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
             OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
              "Pattern search %i: (%i, %i)    Cost: %i",
@@ -2419,20 +2449,23 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
             }
           }
           mvstate = OD_SEARCH_STATES[mvstate][best_site];
-          best_vec[0] += OD_SITE_DX[best_site];
-          best_vec[1] += OD_SITE_DY[best_site];
+          best_vec[0] += 2*OD_SITE_DX[best_site];
+          best_vec[1] += 2*OD_SITE_DY[best_site];
           if (mvstate == OD_SEARCH_STATE_DONE) break;
         }
       }
     }
   }
+  OD_ASSERT((best_vec[0] & 1) == 0);
+  OD_ASSERT((best_vec[1] & 1) == 0);
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Finished. Best vector: (%i, %i)  Best cost %i",
    best_vec[0], best_vec[1], best_cost));
   mv->bma_mvs[0][ref][0] = best_vec[0];
   mv->bma_mvs[0][ref][1] = best_vec[1];
-  mvg->mv[0] = best_vec[0] << 3;
-  mvg->mv[1] = best_vec[1] << 3;
+  mvg->mv[0] = 4*best_vec[0];
+  mvg->mv[1] = 4*best_vec[1];
+
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
   if (animating) {
     char iter_label[16];
@@ -5785,8 +5818,8 @@ void od_mv_est_update_fullpel_mvs(od_mv_est_ctx *est, int ref) {
       mvg = state->mv_grid[vy] + vx;
       if (!mvg->valid) continue;
       mv = est->mvs[vy] + vx;
-      mv->bma_mvs[0][ref][0] = mvg->mv[0] >> 3;
-      mv->bma_mvs[0][ref][1] = mvg->mv[1] >> 3;
+      mv->bma_mvs[0][ref][0] = 2*(mvg->mv[0] >> 3);
+      mv->bma_mvs[0][ref][1] = 2*(mvg->mv[1] >> 3);
     }
   }
 }
