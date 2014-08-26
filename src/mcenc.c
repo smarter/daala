@@ -901,8 +901,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     OD_SORT2I(a[0][1], a[2][1]);
     OD_SORT2I(a[1][0], a[3][0]);
     OD_SORT2I(a[1][1], a[3][1]);
-    predx = OD_DIV2(a[1][0]) + OD_DIV2(a[2][0]);
-    predy = OD_DIV2(a[1][1]) + OD_DIV2(a[2][1]);
+    predx = OD_DIV2_RE(a[1][0] + a[2][0]);
+    predy = OD_DIV2_RE(a[1][1] + a[2][1]);
     candx = OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(predx), mvxmax);
     candy = OD_CLAMPI(mvymin, 2*OD_DIV2_RE(predy), mvymax);
     OD_ASSERT((candx & 1) == 0);
