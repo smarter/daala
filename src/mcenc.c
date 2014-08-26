@@ -1005,7 +1005,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
        OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
        - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 16, 0x8000), mvymax);
       /*Examine the candidates in Set C.*/
-      for (ci = 0; ci < 5; ci++) {
+      for (ci = 0; ci < 4; ci++) {
         candx = cands[ci][0];
         candy = cands[ci][1];
         if (od_mv_est_is_hit(est, candx, candy)) {
