@@ -1016,11 +1016,11 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       }
       /*The constant acceleration predictor:*/
       cands[4][0] = OD_CLAMPI(mvxmin,
-       2*OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][0]*est->mvapw[ref][0]
-       - mv->bma_mvs[2][ref][0]*est->mvapw[ref][1], 17, 0x9000), mvxmax);
+       2*OD_DIV_ROUND_POW2(OD_DIV2_RE(mv->bma_mvs[1][ref][0])*est->mvapw[ref][0]
+       - OD_DIV2_RE(mv->bma_mvs[2][ref][0])*est->mvapw[ref][1], 16, 0x8000), mvxmax);
       cands[4][1] = OD_CLAMPI(mvymin,
-       2*OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
-       - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 17, 0x9000), mvymax);
+       2*OD_DIV_ROUND_POW2(OD_DIV2_RE(mv->bma_mvs[1][ref][1])*est->mvapw[ref][0]
+       - OD_DIV2_RE(mv->bma_mvs[2][ref][1])*est->mvapw[ref][1], 16, 0x8000), mvymax);
       OD_ASSERT((mv->bma_mvs[1][ref][0] & 1) == 0);
       OD_ASSERT((mv->bma_mvs[2][ref][0] & 1) == 0);
       OD_ASSERT((mv->bma_mvs[1][ref][1] & 1) == 0);
