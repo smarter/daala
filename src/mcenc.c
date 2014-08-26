@@ -2136,7 +2136,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   bymax = OD_MINI(by + (mvb_sz << OD_LOG_MVBSIZE_MIN), state->frame_height);
   mvymax = OD_MINI(bymax + 31, state->frame_height + OD_UMV_PADDING) - bymax;
 
-  // Halfpel-ize
+  /* Halfpel-ize */
   mvxmin *= 2;
   mvxmax *= 2;
   mvymin *= 2;
@@ -2199,13 +2199,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   for (ci = 0; ci < ncns; ci++) {
     a[ci][0] = cneighbors[ci]->bma_mvs[0][ref][0];
     a[ci][1] = cneighbors[ci]->bma_mvs[0][ref][1];
-    cands[ci][0] = OD_CLAMPI(mvxmin, a[ci][0], mvxmax);
-    cands[ci][1] = OD_CLAMPI(mvymin, a[ci][1], mvymax);
-
-    OD_ASSERT((a[ci][0] & 1) == 0);
-    OD_ASSERT((a[ci][1] & 1) == 0);
-    OD_ASSERT((cands[ci][0] & 1) == 0);
-    OD_ASSERT((cands[ci][1] & 1) == 0);
+    cands[ci][0] = OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(a[ci][0]), mvxmax);
+    cands[ci][1] = OD_CLAMPI(mvymin, 2*OD_DIV2_RE(a[ci][1]), mvymax);
   }
   /*Compute the median predictor:*/
   if (ncns > 3) {
@@ -2235,8 +2230,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     OD_SORT2I(a[0][1], a[1][1]);
     predx = a[1][0];
     predy = a[1][1];
-    candx = OD_CLAMPI(mvxmin, predx, mvxmax);
-    candy = OD_CLAMPI(mvymin, predy, mvymax);
+    candx = OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(predx), mvxmax);
+    candy = OD_CLAMPI(mvymin, 2*OD_DIV2_RE(predy), mvymax);
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
@@ -2287,9 +2282,9 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     t2 = t2 + (t2 >> OD_MC_THRESH2_SCALE_BITS) + est->thresh2_offs[log_mvb_sz];
     /*Constant velocity predictor:*/
     cands[ncns][0] =
-     OD_CLAMPI(mvxmin, mv->bma_mvs[1][ref][0], mvxmax);
+     OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(mv->bma_mvs[1][ref][0]), mvxmax);
     cands[ncns][1] =
-     OD_CLAMPI(mvymin, mv->bma_mvs[1][ref][1], mvymax);
+     OD_CLAMPI(mvymin, 2*OD_DIV2_RE(mv->bma_mvs[1][ref][1]), mvymax);
     ncns++;
     /*Zero predictor.*/
     cands[ncns][0] = 0;
@@ -2334,23 +2329,17 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       /*Constant velocity predictors from the previous frame:*/
       for (ci = 0; ci < 4; ci++) {
         cands[ci][0] =
-         OD_CLAMPI(mvxmin, pneighbors[ci]->bma_mvs[1][ref][0], mvxmax);
+         OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(pneighbors[ci]->bma_mvs[1][ref][0]), mvxmax);
         cands[ci][1] =
-         OD_CLAMPI(mvymin, pneighbors[ci]->bma_mvs[1][ref][1], mvymax);
-        OD_ASSERT((pneighbors[ci]->bma_mvs[1][ref][0] & 1) == 0);
-        OD_ASSERT((pneighbors[ci]->bma_mvs[1][ref][1] & 1) == 0);
+         OD_CLAMPI(mvymin, 2*OD_DIV2_RE(pneighbors[ci]->bma_mvs[1][ref][1]), mvymax);
       }
       /*The constant acceleration predictor:*/
       cands[4][0] = OD_CLAMPI(mvxmin,
-       OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][0]*est->mvapw[ref][0]
-       - mv->bma_mvs[2][ref][0]*est->mvapw[ref][1], 16, 0x8000), mvxmax);
+       2*OD_DIV_POW2_RE(mv->bma_mvs[1][ref][0]*est->mvapw[ref][0]
+       - mv->bma_mvs[2][ref][0]*est->mvapw[ref][1], 17), mvxmax);
       cands[4][1] = OD_CLAMPI(mvymin,
-       OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
-       - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 16, 0x8000), mvymax);
-      OD_ASSERT((mv->bma_mvs[1][ref][0] & 1) == 0);
-      OD_ASSERT((mv->bma_mvs[2][ref][0] & 1) == 0);
-      OD_ASSERT((mv->bma_mvs[1][ref][1] & 1) == 0);
-      OD_ASSERT((mv->bma_mvs[2][ref][1] & 1) == 0);
+       2*OD_DIV_POW2_RE(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
+       - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 17), mvymax);
       /*Examine the candidates in Set C.*/
       for (ci = 0; ci < 5; ci++) {
         candx = cands[ci][0];
@@ -2465,6 +2454,40 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   mv->bma_mvs[0][ref][1] = best_vec[1];
   mvg->mv[0] = 4*best_vec[0];
   mvg->mv[1] = 4*best_vec[1];
+
+  {
+    int dx, dy, best_dx, best_dy;
+    int sad, rate, cost;
+    equal_mvs = 0; /* No half-pel candidates */
+    best_dx = 0;
+    best_dy = 0;
+    for (dy = -1; dy < 2; dy++) {
+      for (dx = -1; dx < 2; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        sad = od_mv_est_bma_sad8(est, ref, bx, by, best_vec[0] + dx,
+         best_vec[1] + dy, log_mvb_sz);
+        rate = od_mv_est_bits(est, equal_mvs,
+         best_vec[0] + dx, best_vec[1] + dy, predx, predy);
+        cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
+        if (cost < best_cost) {
+          best_sad = sad;
+          best_rate = rate;
+          best_cost = cost;
+          best_dx = dx;
+          best_dy = dy;
+        }
+      }
+    }
+    if (best_dx != 0 || best_dy != 0) {
+      OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
+              "Finished refinement. Best vector: (%i, %i)  Best cost %i",
+              best_vec[0] + best_dx, best_vec[1] + best_dy, best_cost));
+      mv->bma_mvs[0][ref][0] = best_vec[0] + best_dx;
+      mv->bma_mvs[0][ref][1] = best_vec[1] + best_dy;
+      mvg->mv[0] = 4*(best_vec[0] + best_dx);
+      mvg->mv[1] = 4*(best_vec[1] + best_dy);
+    }
+  }
 
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
   if (animating) {
@@ -5818,8 +5841,8 @@ void od_mv_est_update_fullpel_mvs(od_mv_est_ctx *est, int ref) {
       mvg = state->mv_grid[vy] + vx;
       if (!mvg->valid) continue;
       mv = est->mvs[vy] + vx;
-      mv->bma_mvs[0][ref][0] = 2*(mvg->mv[0] >> 3);
-      mv->bma_mvs[0][ref][1] = 2*(mvg->mv[1] >> 3);
+      mv->bma_mvs[0][ref][0] = mvg->mv[0] >> 2;
+      mv->bma_mvs[0][ref][1] = mvg->mv[1] >> 2;
     }
   }
 }
