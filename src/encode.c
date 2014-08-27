@@ -1068,7 +1068,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     }
 #if defined(OD_DUMP_IMAGES)
     /*Dump reconstructed frame.*/
-    /*od_state_dump_img(&enc->state,enc->state.io_imgs + OD_FRAME_REC,"rec");*/
+    od_state_dump_img(&enc->state,enc->state.io_imgs + OD_FRAME_REC,"rec");
     od_state_fill_vis(&enc->state);
     od_state_dump_img(&enc->state, &enc->state.vis_img, "vis");
 #endif
@@ -1226,7 +1226,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
             }
           }
           else {
-            OD_ASSERT(!mvp->valid);
+            mvp->valid = 0;
+            /*OD_ASSERT(!mvp->valid);*/
           }
         }
         else if (vx < 2 || vx > nhmvbs - 2) {

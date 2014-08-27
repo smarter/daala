@@ -782,6 +782,8 @@ void od_mv_est_check_rd_state(od_mv_est_ctx *est, int ref, int mv_res) {
 static const unsigned char OD_YCbCr_MVCAND[3] = { 210, 16, 214 };
 #endif
 
+static int bma_halfpels = 0;
+
 static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   od_state *state;
   od_mv_grid_pt *mvg;
@@ -1130,7 +1132,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   mv->bma_mvs[0][ref][1] = best_vec[1];
   mvg->mv[0] = 4*best_vec[0];
   mvg->mv[1] = 4*best_vec[1];
-#if 0
+#if 1
   {
     int dx, dy, best_dx, best_dy;
     int sad, rate, cost;
@@ -1161,6 +1163,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       mv->bma_mvs[0][ref][1] = best_vec[1] + best_dy;
       mvg->mv[0] = 4*(best_vec[0] + best_dx);
       mvg->mv[1] = 4*(best_vec[1] + best_dy);
+      if (best_dx != 0) bma_halfpels++;
+      if (best_dy != 0) bma_halfpels++;
     }
   }
 #endif
@@ -1280,6 +1284,8 @@ static void od_mv_est_init_mvs(od_mv_est_ctx *est, int ref) {
       }
     }
   }
+  printf("bma_halfpels: %d\n", bma_halfpels);
+  bma_halfpels = 0;
 }
 
 /*STAGE 2: DECIMATION.*/
@@ -2027,6 +2033,16 @@ static void od_mv_est_decimate(od_mv_est_ctx *est, int ref) {
          ax, ay, vx, vy, ancestor->dd, ancestor->dr));
       }
       state->mv_grid[vy][vx].valid = 0;
+#if 0
+      if ((state->mv_grid[vy][vx].mv[0] >> 2) & 1) {
+        fprintf(stderr, "X");
+        state->mv_grid[vy][vx].valid = 1;
+      }
+      if ((state->mv_grid[vy][vx].mv[1] >> 2) & 1) {
+        fprintf(stderr, "Y");
+        state->mv_grid[vy][vx].valid = 1;
+      }
+#endif
       od_mv_dec_heap_del(est, merge);
       est->row_counts[vy]--;
       est->col_counts[vx]--;
@@ -4125,7 +4141,7 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
 #endif
   od_mv_est_init_mvs(est, ref);
   od_mv_est_decimate(est, ref);
-  /*This threshold is somewhat arbitrary.
+  /*this threshold is somewhat arbitrary.
     Chen and Willson use 6000 (with SSD as an error metric).
     We would like something more dependent on the frame size.
     For CIF, there are a maximum of 6992 vertices in the mesh, which is pretty

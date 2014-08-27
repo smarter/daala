@@ -883,6 +883,7 @@ int od_state_dump_yuv(od_state *state, od_img *img, const char *tag) {
 static const unsigned char OD_YCbCr_BORDER[3] = {113, 72, 137};
 static const unsigned char OD_YCbCr_EDGE[3] = {41, 240, 110};
 static const unsigned char OD_YCbCr_MV[3] = {81, 90, 240};
+static const unsigned char OD_YCbCr_XX[3] = {149, 43, 21};
 
 void od_img_draw_point(od_img *img, int x, int y,
  const unsigned char ycbcr[3]) {
@@ -995,6 +996,8 @@ static void od_state_draw_mv_grid_block(od_state *state,
   }
 }
 
+static int halfpels = 0;
+
 void od_state_draw_mv_grid(od_state *state) {
   int vx;
   int vy;
@@ -1061,12 +1064,20 @@ static void od_state_draw_mvs_block(od_state *state,
       mvy[k] = grid[k]->mv[1];
     }
     for (k = 0; k < 4; k++) {
+      if ((grid[k]->mv[0] >> 2) & 1) { fprintf(stderr, "X"); halfpels++; }
+      if ((grid[k]->mv[1] >> 2) & 1) { fprintf(stderr, "Y"); halfpels++; }
       x0 = (vx - 2 + (dxp[k] << log_mvb_sz) << 3) + (OD_UMV_PADDING << 1);
       y0 = (vy - 2 + (dyp[k] << log_mvb_sz) << 3) + (OD_UMV_PADDING << 1);
       /*od_img_draw_point(&state->vis_img, x0, y0, OD_YCbCr_MV);*/
+      if (((grid[k]->mv[0] >> 2) & 1) || ((grid[k]->mv[1] >> 2) & 1)) {
+      od_img_draw_line(&state->vis_img, x0, y0,
+       x0 + OD_DIV_ROUND_POW2(grid[k]->mv[0], 2, 2),
+       y0 + OD_DIV_ROUND_POW2(grid[k]->mv[1], 2, 2), OD_YCbCr_XX);
+      } else {
       od_img_draw_line(&state->vis_img, x0, y0,
        x0 + OD_DIV_ROUND_POW2(grid[k]->mv[0], 2, 2),
        y0 + OD_DIV_ROUND_POW2(grid[k]->mv[1], 2, 2), OD_YCbCr_MV);
+      }
     }
   }
 }
@@ -1083,6 +1094,8 @@ void od_state_draw_mvs(od_state *state) {
       od_state_draw_mvs_block(state, vx, vy, 2);
     }
   }
+  printf("halfpels: %d\n", halfpels);
+  halfpels = 0;
 }
 
 void od_state_fill_vis(od_state *state) {
