@@ -4142,7 +4142,7 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
      OD_SQUARE_NSITES, OD_SQUARE_SITES);
   }
   while (dcost < cost_thresh);
-#else
+#elif 0
   /*Diamond search.
     This appears to give the same quality as the logarithmic search, but at
      nearly 10 times the speed.*/
