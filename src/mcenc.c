@@ -4027,6 +4027,7 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int ref, int cost_thresh) {
     We could also try rounding the results after refinement, I guess.
     I'm not sure it makes much difference*/
   od_mv_est_update_fullpel_mvs(est, ref);
+#if 0
   do {
     dcost = od_mv_est_refine(est, ref, 2, 2,
      OD_DIAMOND_NSITES, OD_DIAMOND_SITES);
@@ -4063,6 +4064,7 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int ref, int cost_thresh) {
     }
   }
   state->mv_res = best_mv_res;
+#endif
 }
 
 void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
@@ -4143,7 +4145,7 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
      OD_SQUARE_NSITES, OD_SQUARE_SITES);
   }
   while (dcost < cost_thresh);
-#else
+#elif 0
   /*Diamond search.
     This appears to give the same quality as the logarithmic search, but at
      nearly 10 times the speed.*/
