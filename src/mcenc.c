@@ -620,7 +620,7 @@ static ogg_int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
   dy = (pby << 1 >> iplane->ydec) + pmvy;
   ret = od_enc_sad8(est->enc, iplane->data + dy*iplane->ystride + dx,
    iplane->ystride << 1, 2, 0, pbx, pby, log_mvb_sz + 2);
-  if (est->flags & OD_MC_USE_CHROMA) {
+  if (0 && est->flags & OD_MC_USE_CHROMA) {
     int pli;
     for (pli = 1; pli < state->input.nplanes; pli++) {
       iplane = state->ref_imgs[refi].planes + pli;
@@ -649,7 +649,7 @@ static ogg_int32_t od_mv_est_sad8(od_mv_est_ctx *est,
    vx, vy, oc, s, log_mvb_sz);
   ret = od_enc_sad8(est->enc, pred[0], sizeof(pred[0]), 1, 0,
    (vx - 2) << 2, (vy - 2) << 2, log_mvb_sz + 2);
-  if (est->flags & OD_MC_USE_CHROMA) {
+  if (0 && est->flags & OD_MC_USE_CHROMA) {
     int pli;
     for (pli = 1; pli < state->input.nplanes; pli++) {
       od_state_pred_block_from_setup(state, pred[0], sizeof(pred[0]), ref, pli,
@@ -4089,7 +4089,7 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
   est->thresh1[2] = 256 >> (iplane->xdec + iplane->ydec);
   /*If we're using the chroma planes, then our distortions will be larger.
     Compensate by increasing lambda and the termination thresholds.*/
-  if (est->flags & OD_MC_USE_CHROMA) {
+  if (0 && est->flags & OD_MC_USE_CHROMA) {
     for (pli = 1; pli < state->input.nplanes; pli++) {
       iplane = state->input.planes + pli;
       est->lambda +=
