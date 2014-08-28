@@ -1127,7 +1127,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   mv->bma_mvs[0][ref][1] = best_vec[1];
   mvg->mv[0] = 4*best_vec[0];
   mvg->mv[1] = 4*best_vec[1];
-
+#if 0
   {
     int dx, dy, best_dx, best_dy;
     int sad, rate, cost;
@@ -1160,6 +1160,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       mvg->mv[1] = 4*(best_vec[1] + best_dy);
     }
   }
+#endif
 
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
   if (animating) {
