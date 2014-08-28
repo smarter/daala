@@ -1140,7 +1140,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
          best_vec[1] + dy, log_mvb_sz);
         rate = od_mv_est_bits(best_vec[0] + dx, best_vec[1] + dy,
          predx, predy);
-        cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
+        cost = (sad << OD_ERROR_SCALE) + 1.5*rate*est->lambda;
         if (cost < best_cost) {
           best_sad = sad;
           best_rate = rate;
