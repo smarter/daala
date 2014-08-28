@@ -267,7 +267,7 @@ static void od_mv_est_init(od_mv_est_ctx *est, od_enc_ctx *enc) {
   est->dec_heap = (od_mv_node **)_ogg_malloc(
    sizeof(*est->dec_heap)*(nvmvbs + 1)*(nhmvbs + 1));
   est->hit_bit = 0;
-  est->mv_res_min = 0;
+  est->mv_res_min = 2;
   est->flags = OD_MC_USE_CHROMA;
 }
 

@@ -178,7 +178,7 @@ int daala_encode_ctl(daala_enc_ctx *enc, int req, void *buf, size_t buf_sz) {
       if (mv_res_min < 0 || mv_res_min > 2) {
         return OD_EINVAL;
       }
-      enc->mvest->mv_res_min = mv_res_min;
+      enc->mvest->mv_res_min = 2;
       return OD_SUCCESS;
     }
     case OD_SET_MV_LEVEL_MIN:
