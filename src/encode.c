@@ -916,8 +916,8 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   if (abs(oy) >= 3) generic_encode(&enc->ec, model, abs(oy) - 3, height << (3 - mv_res), &ey, 2);
   if (abs(ox)) od_ec_enc_bits(&enc->ec, ox < 0, 1);
   if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
-  mv_ex[level] -= (mv_ex[level] - (abs(ox) << mv_res << 16)) >> 6;
-  mv_ey[level] -= (mv_ey[level] - (abs(oy) << mv_res << 16)) >> 6;
+  mv_ex[level] -= (mv_ex[level] - ((abs(ox) - 3) << mv_res << 16)) >> 6;
+  mv_ey[level] -= (mv_ey[level] - ((abs(oy) - 3) << mv_res << 16)) >> 6;
 }
 
 int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
