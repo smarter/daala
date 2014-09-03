@@ -1044,17 +1044,27 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   /*Interleave positive and negative values.*/
   model = &enc->state.adapt.mv_model;
   id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
+  OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
+   OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_LT3);
   od_encode_cdf_adapt(&enc->ec, id, enc->state.adapt.mv_small_cdf[equal_mvs],
    16, enc->state.adapt.mv_small_increment);
   if (abs(ox) >= 3) {
+    OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
+     OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_GE3_X);
     generic_encode(&enc->ec, model, abs(ox) - 3, mv_range_x,
      &enc->state.adapt.mv_ex[level], 6);
   }
   if (abs(oy) >= 3) {
+    OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
+     OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_GE3_Y);
     generic_encode(&enc->ec, model, abs(oy) - 3, mv_range_y,
      &enc->state.adapt.mv_ey[level], 6);
   }
+  OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
+   OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_SIGN_X);
   if (abs(ox)) od_ec_enc_bits(&enc->ec, ox < 0, 1);
+  OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
+   OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_SIGN_Y);
   if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
 }
 
