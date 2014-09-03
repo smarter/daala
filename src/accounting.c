@@ -42,7 +42,12 @@ static const char *OD_ACCT_TECHNIQUE_NAMES[OD_ACCT_NTECHS] = {
   "intra-mode",
   "dc-coeff",
   "ac-coeffs",
-  "motion-vectors"
+  "motion-vectors-others",
+  "motion-vectors-lt3",
+  "motion-vectors-ge3-x",
+  "motion-vectors-ge3-y",
+  "motion-vectors-sign-x",
+  "motion-vectors-sign-y"
 };
 
 static const char *OD_ACCT_PLANE_NAMES[OD_ACCT_NPLANES] = {
