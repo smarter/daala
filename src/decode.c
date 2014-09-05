@@ -670,7 +670,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec) {
       else if (grid[vy - 1][vx - 1].valid && grid[vy - 1][vx + 1].valid
        && grid[vy + 1][vx + 1].valid && grid[vy + 1][vx - 1].valid) {
         mvp->valid = od_ec_decode_bool_q15(&dec->ec, 16384);
-        if (mvp->valid) {
+        if (mvp->valid  && od_dec_mv_in_frame(vx, vy, nhmvbs, nvmvbs)) {
           od_decode_mv(dec, mvp, vx, vy, 3, mv_res, width, height);
         }
       }
@@ -683,7 +683,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec) {
       if (grid[vy-1][vx].valid && grid[vy][vx-1].valid
        && grid[vy+1][vx].valid && grid[vy][vx+1].valid) {
         mvp->valid = od_ec_decode_bool_q15(&dec->ec, 16384);
-        if (mvp->valid && od_dec_mv_in_frame(vx, vy, nhmvbs, nvmvbs)) {
+        if (mvp->valid) {
           od_decode_mv(dec, mvp, vx, vy, 4, mv_res, width, height);
         }
       }
