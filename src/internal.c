@@ -191,6 +191,18 @@ void **od_calloc_2d(size_t _height, size_t _width, size_t _sz) {
   return (void **)ret;
 }
 
+void od_clear_2d(void *ptr, size_t height, size_t width, size_t sz) {
+  size_t colsz;
+  size_t rowsz;
+  size_t datsz;
+  char *datptr;
+  colsz = height*sizeof(void *);
+  rowsz = sz*width;
+  datsz = rowsz*height;
+  datptr = (char*)ptr + colsz;
+  memset(datptr, 0, datsz);
+}
+
 void od_free_2d(void *_ptr) {
   _ogg_free(_ptr);
 }

@@ -1040,6 +1040,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
 #endif
     OD_LOG((OD_LOG_ENCODER, OD_LOG_INFO, "Predicting frame %i:",
      (int)daala_granule_basetime(enc, enc->state.cur_time)));
+    od_state_mvs_reset(&enc->state);
     /*2851196 ~= sqrt(ln(2)/6) in Q23.
       The lower bound of 56 is there because we do not yet consider PVQ noref
        flags during the motion search, so we waste far too many bits trying to

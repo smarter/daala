@@ -177,12 +177,21 @@ static int od_state_mvs_init(od_state *state) {
   int nvmvbs;
   nhmvbs = (state->nhmbs + 1) << 2;
   nvmvbs = (state->nvmbs + 1) << 2;
-  state->mv_grid = (od_mv_grid_pt **)od_calloc_2d(nvmvbs + 1, nhmvbs + 1,
+  state->mv_grid = (od_mv_grid_pt **)od_malloc_2d(nvmvbs + 1, nhmvbs + 1,
    sizeof(**state->mv_grid));
   if (OD_UNLIKELY(!state->mv_grid)) {
     return OD_EFAULT;
   }
   return OD_SUCCESS;
+}
+
+void od_state_mvs_reset(od_state *state) {
+  int nhmvbs;
+  int nvmvbs;
+  nhmvbs = (state->nhmbs + 1) << 2;
+  nvmvbs = (state->nvmbs + 1) << 2;
+  od_clear_2d(state->mv_grid, nvmvbs + 1, nhmvbs + 1,
+   sizeof(**state->mv_grid));
 }
 
 static void od_restore_fpu_c(void) {}
