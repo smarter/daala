@@ -211,6 +211,7 @@ static void od_state_opt_vtbl_init(od_state *state) {
 static int od_state_init_impl(od_state *state, const daala_info *info) {
   int nplanes;
   int pli;
+  int i;
   /*First validate the parameters.*/
   if (info == NULL) return OD_EFAULT;
   nplanes = info->nplanes;
@@ -303,6 +304,12 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
         return OD_EFAULT;
       }
     }
+  }
+  state->mv_small_count[0] = 10;
+  state->mv_small_count_total = 10;
+  for (i = 1; i < 16; i++) {
+    state->mv_small_count[i] = 1;
+    state->mv_small_count_total++;
   }
   state->bsize = (unsigned char *)_ogg_malloc(
    sizeof(*state->bsize)*(state->nhsb + 2)*4*(state->nvsb + 2)*4);

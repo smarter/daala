@@ -167,6 +167,9 @@ struct od_state{
   /** Increments by 1 for each frame. */
   ogg_int64_t         cur_time;
   od_mv_grid_pt **mv_grid;
+  int mv_small_count[16];
+  int mv_small_count_total;
+  int mv_small_rate_est[16];
 
   /** number of horizontal macro blocks. */
   int                 nhmbs;

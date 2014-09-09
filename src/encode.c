@@ -907,6 +907,8 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
    OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_LT3);
   od_encode_cdf_adapt(&enc->ec, id, enc->state.adapt.mv_small_cdf, 16,
    enc->state.adapt.mv_small_increment);
+  enc->state.mv_small_count[id]++;
+  enc->state.mv_small_count_total++;
   if (abs(ox) >= 3) {
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_GE3_X);
@@ -1160,6 +1162,12 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     od_mv_grid_pt *mvp;
     od_mv_grid_pt *other;
     od_mv_grid_pt **grid;
+
+    for (i = 0; i < 16; i++) {
+      enc->state.mv_small_count[i] = 0;
+    }
+    enc->state.mv_small_count_total = 0;
+
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS);
     nhmvbs = (enc->state.nhmbs + 1) << 2;
@@ -1302,6 +1310,43 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     }
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_UNKNOWN);
+
+    {
+#if 0
+      int i;
+      double p[16];
+      for (i = 0; i < 16; i++) {
+        p[i] = (double)(enc->state.adapt.mv_small_cdf[i]
+         - (i > 0 ? enc->state.adapt.mv_small_cdf[i-1] : 0))/enc->state.adapt.mv_small_cdf[15];
+        /*printf("%f ", p[i]);*/
+      }
+      /*printf("\n");*/
+      for (i = 0; i < 16; i++) {
+        printf("(%d, %d): %f\n", i%4, i/4, -log(p[i]));
+      }
+#elif 0
+      int i;
+      FILE *log = fopen("small_cdf.log", "a");
+      for (i = 0; i < 16; i++) {
+        fprintf(log, "%d ", enc->state.adapt.mv_small_cdf[i]);
+      }
+      fprintf(log, "\n");
+      fclose(log);
+#endif
+    }
+    for (i = 0; i < 16; i++) {
+      int new_rate = 65536*8.0f*(OD_LOG2(OD_MAXI(enc->state.mv_small_count_total, 1))
+       - OD_LOG2(OD_MAXI(enc->state.mv_small_count[i], 1)));
+      enc->state.mv_small_rate_est[i] += (new_rate >> 6)
+       - (enc->state.mv_small_rate_est[i] >> 6);
+    }
+  } else {
+    enc->state.mv_small_rate_est[0] = 65536*8.0f*(OD_LOG2(1280+15*128)
+     - OD_LOG2(1280));
+   for (i = 1; i < 16; i++) {
+     enc->state.mv_small_rate_est[i] = 65536*8.0f*(OD_LOG2(1280+15*128)
+      - OD_LOG2(128));
+    }
   }
   {
     int xdec;
