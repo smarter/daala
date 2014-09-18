@@ -632,18 +632,19 @@ static int od_mv_est_bits(od_mv_est_ctx *est,
   int oy;
   int id;
   int cost;
-  int sign_cost;
   cost = 0;
-  sign_cost = 1 << OD_BITRES;
   ox = dx - predx;
   oy = dy - predy;
-  id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
-  cost += ((ox != 0) + (oy != 0))*sign_cost;
+  id = 0;
+  if (ox > 0) id += 1;
+  else if (ox < 0) id += 2;
+  if (oy > 0) id += 3*1;
+  else if (oy < 0) id += 3*2;
   cost += est->mv_small_rate_est[id];
-  if (abs(ox) >= 3)
-    cost += OD_MV_EST_RATE[OD_MINI(abs(ox) - 3, 255)];
-  if (abs(oy) >= 3)
-    cost += OD_MV_EST_RATE[OD_MINI(abs(oy) - 3, 255)];
+  if (abs(ox) != 0)
+    cost += OD_MV_EST_RATE[OD_MINI(abs(ox) - 1, 255)];
+  if (abs(oy) != 0)
+    cost += OD_MV_EST_RATE[OD_MINI(abs(oy) - 1, 255)];
   return cost;
 }
 
