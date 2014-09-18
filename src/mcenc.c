@@ -639,7 +639,7 @@ static int od_mv_est_bits(od_mv_est_ctx *est,
   oy = dy - predy;
   id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
   cost += ((ox != 0) + (oy != 0))*sign_cost;
-  cost += est->mv_small_rate_est[id];
+  cost += (est->mv_small_rate_est[id] + (1 << 15)) >> 16;
   if (abs(ox) >= 3)
     cost += OD_MV_EST_RATE[OD_MINI(abs(ox) - 3, 255)];
   if (abs(oy) >= 3)
@@ -4082,13 +4082,6 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
   est->level_min = OD_MINI(est->enc->params.mv_level_min,
    est->enc->params.mv_level_max);
   est->level_max = est->enc->params.mv_level_max;
-  /*Rate estimations*/
-  for (i = 0; i < 16; i++) {
-    est->mv_small_rate_est[i] = (1 << OD_BITRES)
-     *(OD_LOG2(est->enc->state.adapt.mv_small_cdf[15])
-     - (OD_LOG2(est->enc->state.adapt.mv_small_cdf[i]
-     - (i > 0 ? est->enc->state.adapt.mv_small_cdf[i - 1] : 0)))) + 0.5;
-  }
   /*If the luma plane is decimated for some reason, then our distortions will
      be smaller, so scale lambda appropriately.*/
   est->lambda = lambda >> (iplane->xdec + iplane->ydec);

@@ -890,6 +890,9 @@ static void od_encode_block(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int pli,
   }
 }
 
+static int mv_small_rate_est2[16] = { 0 };
+static int mv_small_rate_est2_count[16] = { 0 };
+
 static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
  int vy, int level, int mv_res, int width, int height) {
   generic_encoder *model;
@@ -897,6 +900,7 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   int ox;
   int oy;
   int id;
+  int count;
   od_state_get_predictor(&enc->state, pred, vx, vy, level, mv_res);
   ox = (mvg->mv[0] >> mv_res) - pred[0];
   oy = (mvg->mv[1] >> mv_res) - pred[1];
@@ -905,8 +909,11 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
   OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
    OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_LT3);
+  count = od_ec_enc_tell_frac(&enc->ec);
   od_encode_cdf_adapt(&enc->ec, id, enc->state.adapt.mv_small_cdf, 16,
    enc->state.adapt.mv_small_increment);
+  mv_small_rate_est2[id] += (od_ec_enc_tell_frac(&enc->ec) - count) << 16;
+  mv_small_rate_est2_count[id]++;
   if (abs(ox) >= 3) {
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_GE3_X);
@@ -1084,6 +1091,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     od_state_fill_vis(&enc->state);
     od_state_dump_img(&enc->state, &enc->state.vis_img, "vis");
 #endif
+  } else {
+    /*Rate estimations*/
+    for (i = 0; i < 16; i++) {
+      enc->mvest->mv_small_rate_est[i] = (1 << 16)*(1 << OD_BITRES)
+       *(OD_LOG2(enc->state.adapt.mv_small_cdf[15])
+       - (OD_LOG2(enc->state.adapt.mv_small_cdf[i]
+       - (i > 0 ? enc->state.adapt.mv_small_cdf[i - 1] : 0))));
+    }
   }
   /*Block size switching.*/
   od_state_init_border(&enc->state);
@@ -1160,6 +1175,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     od_mv_grid_pt *mvp;
     od_mv_grid_pt *other;
     od_mv_grid_pt **grid;
+    memset(mv_small_rate_est2, 0, sizeof(mv_small_rate_est2));
+    memset(mv_small_rate_est2_count, 0, sizeof(mv_small_rate_est2_count));
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS);
     nhmvbs = (enc->state.nhmbs + 1) << 2;
@@ -1302,6 +1319,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     }
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_UNKNOWN);
+    for (i = 0; i < 16; i++) {
+      enc->mvest->mv_small_rate_est[i] -= enc->mvest->mv_small_rate_est[i] >> 6;
+      if (mv_small_rate_est2_count[i] != 0) {
+        enc->mvest->mv_small_rate_est[i] +=
+         OD_DIV_ROUND(mv_small_rate_est2[i], mv_small_rate_est2_count[i]) >> 6;
+      }
+      enc->mvest->mv_small_rate_est[i] = OD_MAXI(0, enc->mvest->mv_small_rate_est[i]);
+    }
   }
   {
     int xdec;
