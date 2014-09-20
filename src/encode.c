@@ -911,13 +911,13 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_GE3_X);
     generic_encode(&enc->ec, model, abs(ox) - 3, width << (3 - mv_res),
-     &enc->state.adapt.mv_ex[level], 6);
+     &enc->state.adapt.mv_ex[level != 0], 6);
   }
   if (abs(oy) >= 3) {
     OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
      OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_GE3_Y);
     generic_encode(&enc->ec, model, abs(oy) - 3, height << (3 - mv_res),
-     &enc->state.adapt.mv_ey[level], 6);
+     &enc->state.adapt.mv_ey[level != 0], 6);
   }
   OD_ACCT_UPDATE(&enc->acct, od_ec_enc_tell_frac(&enc->ec),
    OD_ACCT_CAT_TECHNIQUE, OD_ACCT_TECH_MOTION_VECTORS_SIGN_X);
