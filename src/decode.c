@@ -101,11 +101,11 @@ static void od_decode_mv(daala_dec_ctx *dec, od_mv_grid_pt *mvg, int vx,
   ox = id & 0x3;
   if (ox == 3) {
     ox += generic_decode(&dec->ec, model, width << (3 - mv_res),
-     &dec->state.adapt.mv_ex[level != 0], 6);
+     &dec->state.adapt.mv_ex[0], 6);
   }
   if (oy == 3) {
     oy += generic_decode(&dec->ec, model, height << (3 - mv_res),
-     &dec->state.adapt.mv_ey[level != 0], 6);
+     &dec->state.adapt.mv_ey[0], 6);
   }
   if (ox && od_ec_dec_bits(&dec->ec, 1)) ox = -ox;
   if (oy && od_ec_dec_bits(&dec->ec, 1)) oy = -oy;
