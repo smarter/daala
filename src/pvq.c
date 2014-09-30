@@ -407,8 +407,12 @@ static double pvq_synthesis_partial(od_coeff *xcoeff, od_coeff *ypulse,
   double norm;
   double g;
   double x[MAXN];
-  int nn = n-(!noref); /* when noref==0, vector in is sized n-1 */
-
+  int nn;
+  if (qg == 0) {
+    OD_CLEAR(xcoeff, n);
+    return 0;
+  }
+  nn = n-(!noref); /* when noref==0, vector in is sized n-1 */
   yy = 0;
   for (i = 0; i < nn; i++)
     yy += ypulse[i]*(ogg_int32_t)ypulse[i];
