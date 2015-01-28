@@ -399,7 +399,7 @@ void od_adapt_ctx_reset(od_adapt_ctx *state, int is_keyframe) {
   for (i = 0; i < 5; i++) {
     int j;
     for (j = 0; j < 16; j++) {
-      state->mv_small_cdf[i][j] = 256 + 128*j;
+      state->mv_small_cdf[i][j] = 512 + 128*j;
     }
   }
 
