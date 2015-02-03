@@ -85,8 +85,8 @@ static int od_state_ref_imgs_init(od_state *state, int nrefs, int nio) {
   int pli;
   int y;
   OD_ASSERT(nrefs >= 3);
-  OD_ASSERT(nrefs <= 4);
-  OD_ASSERT(nio == 2);
+  OD_ASSERT(nrefs <= 5);
+  OD_ASSERT(nio == 3);
   info = &state->info;
   data_sz = 0;
   /*TODO: Check for overflow before allocating.*/
@@ -158,6 +158,8 @@ static int od_state_ref_imgs_init(od_state *state, int nrefs, int nio) {
   }
   /*Mark all of the reference image buffers available.*/
   for (imgi = 0; imgi < nrefs; imgi++) state->ref_imgi[imgi] = -1;
+  /*Always use the same buffer for OD_FRAME_PREV_INPUT.*/
+  state->ref_imgi[OD_FRAME_PREV_INPUT] = 4;
 #if defined(OD_DUMP_IMAGES)
   /*Fill in the visualization image structure.*/
   img = &state->vis_img;
@@ -234,7 +236,7 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->nhmbs = state->frame_width >> 4;
   state->nvmbs = state->frame_height >> 4;
   od_state_opt_vtbl_init(state);
-  if (OD_UNLIKELY(od_state_ref_imgs_init(state, 4, 2))) {
+  if (OD_UNLIKELY(od_state_ref_imgs_init(state, 5, 3))) {
     return OD_EFAULT;
   }
   if (OD_UNLIKELY(od_state_mvs_init(state))) {
@@ -1224,7 +1226,7 @@ int od_state_dump_img(od_state *state, od_img *img, const char *tag) {
 }
 #endif
 
-void od_state_mc_predict(od_state *state, int ref) {
+void od_state_mc_predict(od_state *state, int desti, int ref) {
   od_img *img;
   int nhmvbs;
   int nvmvbs;
@@ -1233,7 +1235,7 @@ void od_state_mc_predict(od_state *state, int ref) {
   int vy;
   nhmvbs = (state->nhmbs + 1) << 2;
   nvmvbs = (state->nvmbs + 1) << 2;
-  img = state->io_imgs + OD_FRAME_REC;
+  img = state->io_imgs + desti;
   for (vy = 0; vy < nvmvbs; vy += 4) {
     for (vx = 0; vx < nhmvbs; vx += 4) {
       for (pli = 0; pli < img->nplanes; pli++) {

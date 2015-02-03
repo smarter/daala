@@ -759,7 +759,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   od_decode_block_sizes(dec);
   if (!mbctx.is_keyframe) {
     od_dec_mv_unpack(dec);
-    od_state_mc_predict(&dec->state, OD_FRAME_PREV);
+    od_state_mc_predict(&dec->state, OD_FRAME_REC, OD_FRAME_PREV);
   }
   od_decode_residual(dec, &mbctx);
 #if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)

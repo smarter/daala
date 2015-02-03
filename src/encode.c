@@ -842,7 +842,8 @@ static void od_predict_frame(daala_enc_ctx *enc) {
   od_mv_est(enc->mvest, OD_FRAME_PREV,
    OD_MAXI((2851196 + (((1 << OD_COEFF_SHIFT) - 1) >> 1) >> OD_COEFF_SHIFT)*
    enc->quantizer[0] >> (23 - OD_LAMBDA_SCALE), 56));
-  od_state_mc_predict(&enc->state, OD_FRAME_PREV);
+  od_state_mc_predict(&enc->state, OD_FRAME_REC_INPUT, OD_FRAME_PREV_INPUT);
+  od_state_mc_predict(&enc->state, OD_FRAME_REC, OD_FRAME_PREV);
   /*Do edge extension here because the block-size analysis needs to read
     outside the frame, but otherwise isn't read from.*/
   for (pli = 0; pli < nplanes; pli++) {
@@ -1459,7 +1460,10 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   /*Select a free buffer to use for this reference frame.*/
   for (refi = 0; refi == enc->state.ref_imgi[OD_FRAME_GOLD]
    || refi == enc->state.ref_imgi[OD_FRAME_PREV]
-   || refi == enc->state.ref_imgi[OD_FRAME_NEXT]; refi++);
+   || refi == enc->state.ref_imgi[OD_FRAME_PREV_INPUT]
+   || refi == enc->state.ref_imgi[OD_FRAME_NEXT]; refi++) {
+    OD_ASSERT(refi != enc->state.ref_imgi[OD_FRAME_PREV_INPUT]);
+  }
   enc->state.ref_imgi[OD_FRAME_SELF] = refi;
   /*We must be a keyframe if we don't have a reference.*/
   mbctx.is_keyframe |= !(enc->state.ref_imgi[OD_FRAME_PREV] >= 0);
@@ -1532,6 +1536,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   od_state_upsample8(&enc->state,
    enc->state.ref_imgs + enc->state.ref_imgi[OD_FRAME_SELF],
    enc->state.io_imgs + OD_FRAME_REC);
+  od_state_upsample8(&enc->state,
+   enc->state.ref_imgs + enc->state.ref_imgi[OD_FRAME_PREV_INPUT],
+   enc->state.io_imgs + OD_FRAME_INPUT);
 #if defined(OD_DUMP_IMAGES)
   /*Dump reference frame.*/
   /*od_state_dump_img(&enc->state,

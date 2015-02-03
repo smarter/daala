@@ -52,11 +52,15 @@ extern const od_coeff OD_DC_RES[3];
 # define OD_FRAME_NEXT (2)
 /*The current frame.*/
 # define OD_FRAME_SELF (3)
+/*The previous upsampled input frame.*/
+# define OD_FRAME_PREV_INPUT (4)
 
 /*The reconstructed I/O frame.*/
 # define OD_FRAME_REC   (0)
 /*The input I/O frame.*/
 # define OD_FRAME_INPUT (1)
+/*Like OD_FRAME_REC but based on the previous input frame.*/
+# define OD_FRAME_REC_INPUT (2)
 
 /*Constants for the packet state machine common between encoder and decoder.*/
 
@@ -156,13 +160,13 @@ struct od_state{
   ogg_uint32_t        cpu_flags;
   ogg_int32_t         frame_width;
   ogg_int32_t         frame_height;
-  /** Buffer for the 4 ref images. */
-  int                 ref_imgi[4];
+  /** Buffer for the 5 ref images. */
+  int                 ref_imgi[5];
   /** Pointers to the ref images so one can move them around without coping
       them. */
-  od_img              ref_imgs[4];
+  od_img              ref_imgs[5];
   /** Pointer to input and output image. */
-  od_img              io_imgs[2];
+  od_img              io_imgs[3];
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
   /** Increments by 1 for each frame. */
@@ -225,7 +229,7 @@ void od_state_pred_block_from_setup(od_state *_state, unsigned char *_buf,
  int _log_mvb_sz);
 void od_state_pred_block(od_state *_state, unsigned char *_buf, int _ystride,
  int _ref, int _pli, int _vx, int _vy, int _log_mvb_sz);
-void od_state_mc_predict(od_state *_state, int _ref);
+void od_state_mc_predict(od_state *_state, int dsti, int _ref);
 void od_state_init_border(od_state *_state);
 void od_state_upsample8(od_state *_state, od_img *_dst, const od_img *_src);
 int od_state_dump_yuv(od_state *_state, od_img *_img, const char *_tag);
