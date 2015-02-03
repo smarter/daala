@@ -339,6 +339,7 @@ void od_split_superblock(od_block_size_comp *bs,
   const unsigned char *x0;
   double cg4;
   double cg8;
+  int is_intra;
   x0 = psy_img - OD_BLOCK_OFFSET(stride);
   /* The passed in q value is now a quantizer with the same scaling as
      the coefficients. */
@@ -352,7 +353,8 @@ void od_split_superblock(od_block_size_comp *bs,
   cg8 = OD_CG8;
   od_compute_stats(&bs->res[2*OD_MAX_OVERLAP][2*OD_MAX_OVERLAP],
    2*OD_SIZE2_SUMS, &bs->psy_stats);
-  if (psy_img == pred || pred == NULL) {
+  is_intra = psy_img == pred || pred == NULL;
+  if (is_intra) {
     OD_COPY(&bs->img_stats, &bs->psy_stats, 1);
   }
   else {
@@ -452,6 +454,13 @@ void od_split_superblock(od_block_size_comp *bs,
     }
   }
 #endif
+  if (!is_intra) {
+    int i;
+    int j;
+    for (i = 0; i < 4; i++)
+      for (j= 0; j < 4; j++)
+        bsize[i][j] = OD_BLOCK_32X32;
+  }
 }
 
 void od_block_size_encode(od_ec_enc *enc, od_adapt_ctx *adapt,
