@@ -52,14 +52,14 @@ extern const od_coeff OD_DC_RES[3];
 # define OD_FRAME_NEXT (2)
 /*The current frame.*/
 # define OD_FRAME_SELF (3)
-/*The previous upsampled input frame.*/
+/*The previous input image, upsampled.*/
 # define OD_FRAME_PREV_INPUT (4)
 
 /*The reconstructed I/O frame.*/
 # define OD_FRAME_REC   (0)
 /*The input I/O frame.*/
 # define OD_FRAME_INPUT (1)
-/*Like OD_FRAME_REC but based on the previous input frame.*/
+/*The previous input image with motion compensation applied like OD_FRAME_REC.*/
 # define OD_FRAME_REC_INPUT (2)
 
 /*Constants for the packet state machine common between encoder and decoder.*/

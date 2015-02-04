@@ -312,16 +312,54 @@ static float od_psy_var8x8(od_superblock_stats *psy_stats,
   return OD_MAXF(psy/(count*count) - 1.f, 0);
 }
 
+static void inter_split(od_block_size_comp *bs, int bsize_array[4][4],
+ int bsize, int offset_h, int offset_w) {
+  /* length in units of 8x8 blocks */
+  int length = (1 << (bsize + 2))/8;
+  double err;
+  int i;
+  int j;
+  od_superblock_stats *ii_stats;
+  ii_stats = &bs->ideal_img_stats;
+  err = 0;
+  for (i = 0; i < length; i++) {
+    for (j = 0; j < length; j++) {
+      err += ii_stats->Sxx8[OD_MAX_OVERLAP_8 + 2*(offset_h + i)][OD_MAX_OVERLAP_8 + 2*(offset_w + j)];
+    }
+  }
+  err = sqrt(err/(8*length*8*length));
+  if (err < 4.0) {
+    for (i = 0; i < length; i++) {
+      for (j = 0; j < length; j++) {
+        bsize_array[offset_h + i][offset_w + j] = bsize;
+      }
+    }
+  } else {
+    for (i = 0; i < 2; i++) {
+      for (j = 0; j < 2; j++) {
+        if (bsize > OD_BLOCK_8X8) {
+          inter_split(bs, bsize_array, bsize - 1,
+           offset_h + i*(length/2), offset_w + j*(length/2));
+        } else {
+          bsize_array[offset_h][offset_w] = OD_BLOCK_4X4;
+        }
+      }
+    }
+  }
+}
+
 /* This function decides how to split a 32x32 superblock based on a simple
  * activity masking model. The masking at any given point is assumed to be
  * proportional to the local variance. The decision is made using a simple
  * dynamic programming algorithm, working from 8x8 decisions up to 32x32.
  * @param [scratch] bs          Scratch space for computation
  * @param [in]      psy_img     Image on which to compute the psy model
- *                               (should not be a residual)
+=  *                               (should not be a residual)
  * @param [in]      stride      Image stride
  * @param [in]      pred        Prediction input (NULL means no prediction
  *                               available)
+ * @param [in]      ideal_pred  Ideal (lossless) prediction input (NULL means no
+ *                               prediction available)
  * @param [in]      pred_stride Prediction input stride
  * @param [out]     bsize       Decision for each 8x8 block in the image
  *                               (see OD_BLOCK_* macros in block_size.h for
@@ -330,7 +368,8 @@ static float od_psy_var8x8(od_superblock_stats *psy_stats,
  */
 void od_split_superblock(od_block_size_comp *bs,
  const unsigned char *psy_img, int stride,
- const unsigned char *pred, int pred_stride, int bsize[4][4], int q) {
+ const unsigned char *pred, const unsigned char *ideal_pred,
+ int pred_stride, int bsize[4][4], int q) {
   int i;
   int j;
   /* Tuning parameter for block decision (higher values results in smaller
@@ -370,6 +409,16 @@ void od_split_superblock(od_block_size_comp *bs,
     }
     od_compute_stats(&bs->res[2*OD_MAX_OVERLAP][2*OD_MAX_OVERLAP],
      2*OD_SIZE2_SUMS, &bs->img_stats);
+
+    p0 = ideal_pred - OD_BLOCK_OFFSET(pred_stride);
+    for (i = 0; i < 2*OD_SIZE2_SUMS; i++) {
+      for (j = 0; j < 2*OD_SIZE2_SUMS; j++) {
+        bs->res[i][j] = OD_CLAMPI(-128, (int)x0[i*stride + j]
+         - (int)p0[i*pred_stride + j], 127);
+      }
+    }
+    od_compute_stats(&bs->res[2*OD_MAX_OVERLAP][2*OD_MAX_OVERLAP],
+     2*OD_SIZE2_SUMS, &bs->ideal_img_stats);
   }
   /* Compute 4x4 masking */
   for (i = 0; i < 8; i++) {
@@ -455,11 +504,7 @@ void od_split_superblock(od_block_size_comp *bs,
   }
 #endif
   if (!is_intra) {
-    int i;
-    int j;
-    for (i = 0; i < 4; i++)
-      for (j= 0; j < 4; j++)
-        bsize[i][j] = OD_BLOCK_32X32;
+    inter_split(bs, bsize, OD_BLOCK_32X32, 0, 0);
   }
 }
 

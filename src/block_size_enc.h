@@ -85,6 +85,7 @@ typedef struct {
 
 typedef struct {
   od_superblock_stats img_stats;
+  od_superblock_stats ideal_img_stats;
   od_superblock_stats psy_stats;
 
   signed char res[2*OD_SIZE2_SUMS][2*OD_SIZE2_SUMS];
@@ -114,7 +115,8 @@ typedef struct {
 
 void od_split_superblock(od_block_size_comp *bs,
  const unsigned char *psy_img, int stride,
- const unsigned char *pred, int pred_stride, int dec[4][4], int q);
+ const unsigned char *pred, const unsigned char *ideal_pred,
+ int pred_stride, int dec[4][4], int q);
 
 void od_block_size_encode(od_ec_enc *enc, od_adapt_ctx *adapt,
  const unsigned char *bsize, int stride);

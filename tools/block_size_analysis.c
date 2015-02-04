@@ -375,7 +375,7 @@ int switch_decision(unsigned char *img, int w, int h, int stride, int ow, int oh
       for(j=1;j<w32-1;j++){
         int k,m;
         int dec[4][4];
-        od_split_superblock(&bs, img+32*stride*i+32*j, stride, NULL, 0,
+        od_split_superblock(&bs, img+32*stride*i+32*j, stride, NULL, NULL, 0,
          dec, 21 << OD_COEFF_SHIFT);
         for(k=0;k<4;k++)
           for(m=0;m<4;m++)

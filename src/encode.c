@@ -931,6 +931,7 @@ static void od_split_superblocks(daala_enc_ctx *enc, int is_keyframe) {
   for (i = 0; i < nvsb; i++) {
     unsigned char *bimg;
     unsigned char *rimg;
+    unsigned char *primg;
     int istride;
     int rstride;
     int bstride;
@@ -940,12 +941,14 @@ static void od_split_superblocks(daala_enc_ctx *enc, int is_keyframe) {
      state->io_imgs[OD_FRAME_REC].planes[0].ystride;
     bimg = state->io_imgs[OD_FRAME_INPUT].planes[0].data + i*istride*32;
     rimg = state->io_imgs[OD_FRAME_REC].planes[0].data + i*rstride*32;
+    primg = state->io_imgs[OD_FRAME_REC_INPUT].planes[0].data + i*rstride*32;
     for (j = 0; j < nhsb; j++) {
       int bsize[4][4];
       unsigned char *state_bsize;
       state_bsize = &state->bsize[i*4*state->bstride + j*4];
       od_split_superblock(enc->bs, bimg + j*32, istride,
-       is_keyframe ? NULL : rimg + j*32, rstride, bsize, enc->quantizer[0]);
+       is_keyframe ? NULL : rimg + j*32,
+       is_keyframe ? NULL : primg + j*32, rstride, bsize, enc->quantizer[0]);
       /* Grab the 4x4 information returned from `od_split_superblock` in bsize
          and store it in the od_state bsize. */
       for (k = 0; k < 4; k++) {
