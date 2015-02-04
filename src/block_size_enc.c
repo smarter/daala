@@ -312,6 +312,26 @@ static float od_psy_var8x8(od_superblock_stats *psy_stats,
   return OD_MAXF(psy/(count*count) - 1.f, 0);
 }
 
+static int no_split(od_block_size_comp *bs,
+ int bsize, int offset_h, int offset_w) {
+  /* length in units of 8x8 blocks */
+  int length = (1 << (bsize + 2))/8;
+  double err;
+  int i;
+  int j;
+  od_superblock_stats *ii_stats;
+  ii_stats = &bs->ideal_img_stats;
+  err = 0;
+  for (i = 0; i < length; i++) {
+    for (j = 0; j < length; j++) {
+      err += ii_stats->Sxx8[OD_MAX_OVERLAP_8 + 2*(offset_h + i)][OD_MAX_OVERLAP_8 + 2*(offset_w + j)];
+    }
+  }
+  err = sqrt(err/(8*length*8*length));
+  return err < 4.0;
+}
+
+
 static void inter_split(od_block_size_comp *bs, int bsize_array[4][4],
  int bsize, int offset_h, int offset_w) {
   /* length in units of 8x8 blocks */
@@ -442,7 +462,7 @@ void od_split_superblock(od_block_size_comp *bs,
        + bs->psy4[2*i + 1][2*j] + bs->psy4[2*i + 1][2*j + 1]);
       gain4 = cg4 - psy_lambda*(psy4_avg);
       gain8 = cg8 - psy_lambda*(bs->psy8[i][j]);
-      if (gain8 >= gain4) {
+      if (gain8 >= gain4 || (!is_intra && no_split(bs, OD_BLOCK_8X8, i, j))) {
         bsize[i][j] = OD_BLOCK_8X8;
         bs->dec_gain8[i][j] = gain8;
       }
@@ -470,7 +490,7 @@ void od_split_superblock(od_block_size_comp *bs,
       gain8_avg = .25*(bs->dec_gain8[2*i][2*j] + bs->dec_gain8[2*i][2*j + 1]
        + bs->dec_gain8[2*i + 1][2*j] + bs->dec_gain8[2*i + 1][2*j + 1]);
       gain16 = OD_CG16 - psy_lambda*(bs->psy16[i][j]);
-      if (gain16 >= gain8_avg) {
+      if (gain16 >= gain8_avg || (!is_intra && no_split(bs, OD_BLOCK_16X16, 2*i, 2*j))) {
         bsize[2*i][2*j] = bsize[2*i][2*j + 1]
          = bsize[2*i + 1][2*j] = bsize[2*i + 1][2*j + 1] = OD_BLOCK_16X16;
         bs->dec_gain16[i][j] = gain16;
@@ -497,15 +517,17 @@ void od_split_superblock(od_block_size_comp *bs,
     gain16_avg = .25f*(bs->dec_gain16[0][0] + bs->dec_gain16[0][1]
      + bs->dec_gain16[1][0] + bs->dec_gain16[1][1]);
     gain32 = OD_CG32 - psy_lambda*(bs->psy32);
-    if (gain32 >= gain16_avg) {
+    if (gain32 >= gain16_avg || (!is_intra && no_split(bs, OD_BLOCK_32X32, 0, 0))) {
       for (k = 0; k < 4; k++)
         for (m = 0; m < 4; m++) bsize[k][m] = OD_BLOCK_32X32;
     }
   }
 #endif
+  /*
   if (!is_intra) {
     inter_split(bs, bsize, OD_BLOCK_32X32, 0, 0);
   }
+  */
 }
 
 void od_block_size_encode(od_ec_enc *enc, od_adapt_ctx *adapt,
