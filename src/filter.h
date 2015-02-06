@@ -30,7 +30,8 @@ typedef ogg_int32_t od_coeff;
 # define OD_COEFF_BITS (32)
 
 /*There are 3 filter sizes total (4-point, 8-point, 16-point).*/
-# define OD_NFILTER_SIZES (3)
+/*Only use 4-point filter*/
+# define OD_NFILTER_SIZES (1)
 
 /*This is the strength reduced version of ((_a)/(1 << (_b))).
   This will not work for _b == 0, however currently this is only used for
