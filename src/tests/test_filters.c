@@ -317,7 +317,9 @@ int main(int argc, char *argv[]) {
     /*Apply per-block prefilter.*/
     for (j = 0; j < ROWS; j++) {
       for (i = 0; i < COLS; i++) {
-        od_apply_prefilter(luma_test, COLS*32, i, j, 3, bsize, bstride, 0, 0,
+        od_apply_prefilter_rows(luma_test, COLS*32, i, j, 3, bsize, bstride, 0, 0,
+         (i > 0 ? OD_LEFT_EDGE : 0) | (j < ROWS - 1 ? OD_BOTTOM_EDGE : 0));
+        od_apply_prefilter_cols(luma_test, COLS*32, i, j, 3, bsize, bstride, 0, 0,
          (i > 0 ? OD_LEFT_EDGE : 0) | (j < ROWS - 1 ? OD_BOTTOM_EDGE : 0));
       }
     }
@@ -338,7 +340,9 @@ int main(int argc, char *argv[]) {
     /*Apply per-block postfilter.*/
     for (j = 0; j < ROWS; j++) {
       for (i = 0; i < COLS; i++) {
-        od_apply_postfilter(luma_test, COLS*32, i, j, 3, bsize, bstride, 0, 0,
+        od_apply_postfilter_cols(luma_test, COLS*32, i, j, 3, bsize, bstride, 0, 0,
+         (i < COLS - 1 ? OD_RIGHT_EDGE : 0) | (j > 0 ? OD_TOP_EDGE : 0));
+        od_apply_postfilter_rows(luma_test, COLS*32, i, j, 3, bsize, bstride, 0, 0,
          (i < COLS - 1 ? OD_RIGHT_EDGE : 0) | (j > 0 ? OD_TOP_EDGE : 0));
       }
     }
@@ -376,7 +380,9 @@ int main(int argc, char *argv[]) {
     /*Apply per-block prefilter.*/
     for (j = 0; j < ROWS; j++) {
       for (i = 0; i < COLS; i++) {
-        od_apply_prefilter(chroma_test, COLS*16, i, j, 3, bsize, bstride, 1, 1,
+        od_apply_prefilter_rows(chroma_test, COLS*16, i, j, 3, bsize, bstride, 1, 1,
+         (i > 0 ? OD_LEFT_EDGE : 0) | (j < ROWS - 1 ? OD_BOTTOM_EDGE : 0));
+        od_apply_prefilter_cols(chroma_test, COLS*16, i, j, 3, bsize, bstride, 1, 1,
          (i > 0 ? OD_LEFT_EDGE : 0) | (j < ROWS - 1 ? OD_BOTTOM_EDGE : 0));
       }
     }
@@ -397,7 +403,9 @@ int main(int argc, char *argv[]) {
     /*Apply per-block postfilter.*/
     for (j = 0; j < ROWS; j++) {
       for (i = 0; i < COLS; i++) {
-        od_apply_postfilter(chroma_test, COLS*16, i, j, 3, bsize, bstride, 1, 1,
+        od_apply_postfilter_cols(chroma_test, COLS*16, i, j, 3, bsize, bstride, 1, 1,
+         (i < COLS - 1 ? OD_RIGHT_EDGE : 0) | (j > 0 ? OD_TOP_EDGE : 0));
+        od_apply_postfilter_rows(chroma_test, COLS*16, i, j, 3, bsize, bstride, 1, 1,
          (i < COLS - 1 ? OD_RIGHT_EDGE : 0) | (j > 0 ? OD_TOP_EDGE : 0));
       }
     }

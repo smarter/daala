@@ -908,7 +908,34 @@ static void od_apply_filter_rows(od_coeff *c, int stride, int bx, int by,
   }
 }
 
-void od_apply_prefilter(od_coeff *c, int w, int bx, int by, unsigned char l,
+void od_apply_prefilter_rows(od_coeff *c, int w, int bx, int by, unsigned char l,
+ const unsigned char *bsize, int bstride, int xdec, int ydec, int edge) {
+  unsigned d;
+  OD_ASSERT((edge & ~(OD_BOTTOM_EDGE | OD_LEFT_EDGE)) == 0);
+  /*This code assumes 4:4:4 or 4:2:0 input.*/
+  OD_ASSERT(xdec == ydec);
+  d = OD_BLOCK_SIZE4x4_DEC(bsize, bstride, bx << l, by << l, xdec);
+  OD_ASSERT(d <= l);
+  if (d == l) {
+    if (edge & OD_LEFT_EDGE) {
+      od_apply_filter_rows(c, w, bx, by, 0, l, bsize, bstride, xdec, ydec, 0);
+    }
+  }
+  else {
+    l--;
+    bx <<= 1;
+    by <<= 1;
+    od_apply_prefilter_rows(c, w, bx + 0, by + 0, l, bsize, bstride, xdec, ydec,
+     edge | OD_BOTTOM_EDGE);
+    od_apply_prefilter_rows(c, w, bx + 1, by + 0, l, bsize, bstride, xdec, ydec,
+     OD_BOTTOM_EDGE | OD_LEFT_EDGE);
+    od_apply_prefilter_rows(c, w, bx + 0, by + 1, l, bsize, bstride, xdec, ydec,
+     edge);
+    od_apply_prefilter_rows(c, w, bx + 1, by + 1, l, bsize, bstride, xdec, ydec,
+     edge | OD_LEFT_EDGE);
+  }
+}
+void od_apply_prefilter_cols(od_coeff *c, int w, int bx, int by, unsigned char l,
  const unsigned char *bsize, int bstride, int xdec, int ydec, int edge) {
   unsigned d;
   OD_ASSERT((edge & ~(OD_BOTTOM_EDGE | OD_LEFT_EDGE)) == 0);
@@ -920,26 +947,23 @@ void od_apply_prefilter(od_coeff *c, int w, int bx, int by, unsigned char l,
     if (edge & OD_BOTTOM_EDGE) {
       od_apply_filter_cols(c, w, bx, by, 1, l, bsize, bstride, xdec, ydec, 0);
     }
-    if (edge & OD_LEFT_EDGE) {
-      od_apply_filter_rows(c, w, bx, by, 0, l, bsize, bstride, xdec, ydec, 0);
-    }
   }
   else {
     l--;
     bx <<= 1;
     by <<= 1;
-    od_apply_prefilter(c, w, bx + 0, by + 0, l, bsize, bstride, xdec, ydec,
+    od_apply_prefilter_cols(c, w, bx + 0, by + 0, l, bsize, bstride, xdec, ydec,
      edge | OD_BOTTOM_EDGE);
-    od_apply_prefilter(c, w, bx + 1, by + 0, l, bsize, bstride, xdec, ydec,
+    od_apply_prefilter_cols(c, w, bx + 1, by + 0, l, bsize, bstride, xdec, ydec,
      OD_BOTTOM_EDGE | OD_LEFT_EDGE);
-    od_apply_prefilter(c, w, bx + 0, by + 1, l, bsize, bstride, xdec, ydec,
+    od_apply_prefilter_cols(c, w, bx + 0, by + 1, l, bsize, bstride, xdec, ydec,
      edge);
-    od_apply_prefilter(c, w, bx + 1, by + 1, l, bsize, bstride, xdec, ydec,
+    od_apply_prefilter_cols(c, w, bx + 1, by + 1, l, bsize, bstride, xdec, ydec,
      edge | OD_LEFT_EDGE);
   }
 }
 
-void od_apply_postfilter(od_coeff *c, int w, int bx, int by, unsigned char l,
+void od_apply_postfilter_rows(od_coeff *c, int w, int bx, int by, unsigned char l,
  const unsigned char *bsize, int bstride, int xdec, int ydec, int edge) {
   unsigned char d;
   OD_ASSERT((edge & ~(OD_RIGHT_EDGE | OD_TOP_EDGE)) == 0);
@@ -951,6 +975,31 @@ void od_apply_postfilter(od_coeff *c, int w, int bx, int by, unsigned char l,
     if (edge & OD_RIGHT_EDGE) {
       od_apply_filter_rows(c, w, bx, by, 1, l, bsize, bstride, xdec, ydec, 1);
     }
+  }
+  else {
+    l--;
+    bx <<= 1;
+    by <<= 1;
+    od_apply_postfilter_rows(c, w, bx + 0, by + 0, l, bsize, bstride, xdec, ydec,
+     edge | OD_RIGHT_EDGE);
+    od_apply_postfilter_rows(c, w, bx + 1, by + 0, l, bsize, bstride, xdec, ydec,
+     edge);
+    od_apply_postfilter_rows(c, w, bx + 0, by + 1, l, bsize, bstride, xdec, ydec,
+     OD_TOP_EDGE | OD_RIGHT_EDGE);
+    od_apply_postfilter_rows(c, w, bx + 1, by + 1, l, bsize, bstride, xdec, ydec,
+     edge | OD_TOP_EDGE);
+  }
+}
+
+void od_apply_postfilter_cols(od_coeff *c, int w, int bx, int by, unsigned char l,
+ const unsigned char *bsize, int bstride, int xdec, int ydec, int edge) {
+  unsigned char d;
+  OD_ASSERT((edge & ~(OD_RIGHT_EDGE | OD_TOP_EDGE)) == 0);
+  /*This code assumes 4:4:4 or 4:2:0 input.*/
+  OD_ASSERT(xdec == ydec);
+  d = OD_BLOCK_SIZE4x4_DEC(bsize, bstride, bx << l, by << l, xdec);
+  OD_ASSERT(d <= l);
+  if (d == l) {
     if (edge & OD_TOP_EDGE) {
       od_apply_filter_cols(c, w, bx, by, 0, l, bsize, bstride, xdec, ydec, 1);
     }
@@ -959,13 +1008,13 @@ void od_apply_postfilter(od_coeff *c, int w, int bx, int by, unsigned char l,
     l--;
     bx <<= 1;
     by <<= 1;
-    od_apply_postfilter(c, w, bx + 0, by + 0, l, bsize, bstride, xdec, ydec,
+    od_apply_postfilter_cols(c, w, bx + 0, by + 0, l, bsize, bstride, xdec, ydec,
      edge | OD_RIGHT_EDGE);
-    od_apply_postfilter(c, w, bx + 1, by + 0, l, bsize, bstride, xdec, ydec,
+    od_apply_postfilter_cols(c, w, bx + 1, by + 0, l, bsize, bstride, xdec, ydec,
      edge);
-    od_apply_postfilter(c, w, bx + 0, by + 1, l, bsize, bstride, xdec, ydec,
+    od_apply_postfilter_cols(c, w, bx + 0, by + 1, l, bsize, bstride, xdec, ydec,
      OD_TOP_EDGE | OD_RIGHT_EDGE);
-    od_apply_postfilter(c, w, bx + 1, by + 1, l, bsize, bstride, xdec, ydec,
+    od_apply_postfilter_cols(c, w, bx + 1, by + 1, l, bsize, bstride, xdec, ydec,
      edge | OD_TOP_EDGE);
   }
 }

@@ -649,7 +649,11 @@ static void od_decode_residual(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
       /*Apply the prefilter across the entire image.*/
       for (sby = 0; sby < nvsb; sby++) {
         for (sbx = 0; sbx < nhsb; sbx++) {
-          od_apply_prefilter(state->mctmp[pli], w, sbx, sby, 3,
+          od_apply_prefilter_rows(state->mctmp[pli], w, sbx, sby, 3,
+           state->bsize, state->bstride, xdec, ydec,
+           (sbx > 0 ? OD_LEFT_EDGE : 0) |
+           (sby < nvsb - 1 ? OD_BOTTOM_EDGE : 0));
+          od_apply_prefilter_cols(state->mctmp[pli], w, sbx, sby, 3,
            state->bsize, state->bstride, xdec, ydec,
            (sbx > 0 ? OD_LEFT_EDGE : 0) |
            (sby < nvsb - 1 ? OD_BOTTOM_EDGE : 0));
@@ -693,7 +697,10 @@ static void od_decode_residual(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
     /*Apply the postfilter across the entire image.*/
     for (sby = 0; sby < nvsb; sby++) {
       for (sbx = 0; sbx < nhsb; sbx++) {
-        od_apply_postfilter(state->ctmp[pli], w, sbx, sby, 3, state->bsize,
+        od_apply_postfilter_cols(state->ctmp[pli], w, sbx, sby, 3, state->bsize,
+         state->bstride, xdec, ydec, (sby > 0 ? OD_TOP_EDGE : 0) |
+         (sbx < nhsb - 1 ? OD_RIGHT_EDGE : 0));
+        od_apply_postfilter_rows(state->ctmp[pli], w, sbx, sby, 3, state->bsize,
          state->bstride, xdec, ydec, (sby > 0 ? OD_TOP_EDGE : 0) |
          (sbx < nhsb - 1 ? OD_RIGHT_EDGE : 0));
       }
