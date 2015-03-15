@@ -992,6 +992,12 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   /*Interleave positive and negative values.*/
   model = &enc->state.adapt.mv_model;
   id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
+  {
+    int i;
+    for (i = id; i < 16; i++) {
+      enc->mvest->mv_small_rate_cdf[equal_mvs][i]++;
+    }
+  }
   od_encode_cdf_adapt(&enc->ec, id, enc->state.adapt.mv_small_cdf[equal_mvs],
    16, enc->state.adapt.mv_small_increment);
   if (abs(ox) >= 3) {
@@ -1859,6 +1865,17 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   od_adapt_ctx_reset(&enc->state.adapt, mbctx.is_keyframe);
   if (!mbctx.is_keyframe) {
     od_predict_frame(enc);
+
+    {
+      int i;
+      int j;
+      for (i = 0; i < 5; i++) {
+        for (j = 0; j < 16; j++) {
+          enc->mvest->mv_small_rate_cdf[i][j] = 1 + 1*j;
+        }
+      }
+    }
+
     od_encode_mvs(enc);
 #if 1
     od_split_superblocks_rdo(enc, &mbctx);

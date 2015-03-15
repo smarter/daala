@@ -170,6 +170,7 @@ struct od_mv_est_ctx {
   unsigned hit_bit;
   /*The Lagrangian multiplier used for R-D optimization.*/
   int lambda;
+  int mv_small_rate_cdf[5][16];
   /*Rate estimations (in units of OD_BITRES).*/
   int mv_small_rate_est[5][16];
   /*Configuration.*/

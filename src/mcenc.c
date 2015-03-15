@@ -298,6 +298,17 @@ static int od_mv_est_init_impl(od_mv_est_ctx *est, od_enc_ctx *enc) {
   est->hit_bit = UCHAR_MAX;
   est->mv_res_min = 0;
   est->flags = OD_MC_USE_CHROMA;
+
+  {
+    int i;
+    int j;
+    for (i = 0; i < 5; i++) {
+      for (j = 0; j < 16; j++) {
+        est->mv_small_rate_cdf[i][j] = 1280 + 128*j;
+      }
+    }
+  }
+
   return OD_SUCCESS;
 }
 
@@ -4106,12 +4117,27 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
   est->level_max = est->enc->params.mv_level_max;
   /*Rate estimations. Note that this does not depend on the previous frame: at
      this point, the probabilities have been reset by od_adapt_ctx_reset.*/
+  /*
+  for (i = 0; i < 5; i++) {
+    int offset = 0;
+    for (j = 0; j < 16; j++) {
+      /*Make sure that all the values are distinct.*/
+      int cur = est->mv_small_rate_cdf[i][j] + offset;
+      int pred = j > 0 ? est->mv_small_rate_cdf[i][j - 1] : 0;
+      if (cur == pred) {
+        cur++;
+        offset++;
+      }
+      est->mv_small_rate_cdf[i][j] = cur;
+    }
+  }
+  */
   for (i = 0; i < 5; i++) {
     for (j = 0; j < 16; j++) {
       est->mv_small_rate_est[i][j] = (int)((1 << OD_BITRES)
-       *(OD_LOG2(est->enc->state.adapt.mv_small_cdf[i][15])
-       - (OD_LOG2(est->enc->state.adapt.mv_small_cdf[i][j]
-       - (j > 0 ? est->enc->state.adapt.mv_small_cdf[i][j - 1] : 0)))) + 0.5);
+       *(OD_LOG2(est->mv_small_rate_cdf[i][15])
+       - (OD_LOG2(est->mv_small_rate_cdf[i][j]
+       - (j > 0 ? est->mv_small_rate_cdf[i][j - 1] : 0)))) + 0.5);
     }
   }
   /*If the luma plane is decimated for some reason, then our distortions will
