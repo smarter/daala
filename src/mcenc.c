@@ -646,10 +646,10 @@ static int od_mv_est_bits(od_mv_est_ctx *est, int equal_mvs,
   cost += ((ox != 0) + (oy != 0))*sign_cost;
   cost += est->mv_small_rate_est[equal_mvs][id];
   if (abs(ox) >= 3) {
-    cost += OD_MV_GE3_EST_RATE[OD_MINI(abs(ox) - 3, 255)];
+    cost += (OD_MV_GE3_EST_RATE[OD_MINI(abs(ox) - 3, 255)]*3);
   }
   if (abs(oy) >= 3) {
-    cost += OD_MV_GE3_EST_RATE[OD_MINI(abs(oy) - 3, 255)];
+    cost += (OD_MV_GE3_EST_RATE[OD_MINI(abs(oy) - 3, 255)]*3);
   }
   return cost;
 }
