@@ -998,7 +998,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   best_vec[1] = candy;
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Threshold: %i", est->thresh1[log_mvb_sz]));
-  if (best_sad > est->thresh1[log_mvb_sz]) {
+  if (1 || best_sad > est->thresh1[log_mvb_sz]) {
     ogg_int32_t sad;
     ogg_int32_t cost;
     int rate;
@@ -1057,7 +1057,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       }
     }
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG, "Threshold: %i", t2));
-    if (best_sad > t2) {
+    if (1 || best_sad > t2) {
       /*Constant velocity predictors from the previous frame:*/
       for (ci = 0; ci < 4; ci++) {
         cands[ci][0] =
@@ -1105,7 +1105,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       }
       /*Use the same threshold for Set C as in Set B.*/
       OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG, "Threshold: %i", t2));
-      if (best_sad > t2) {
+      if (1 || best_sad > t2) {
         const int *pattern;
         int mvstate;
         int best_site;
