@@ -343,7 +343,7 @@ static const int OD_SITE_DY[13] = {
 #undef OD_USE_SQUARE_SEARCH
 /*Set to use logarithmicly scaled search radius instead of a fixed search
    radius during motion vector refinement.*/
-#undef OD_USE_LOGARITHMIC_REFINEMENT
+#define OD_USE_LOGARITHMIC_REFINEMENT
 
 #if defined(OD_USE_SQUARE_SEARCH) || defined(OD_USE_LOGARITHMIC_REFINEMENT)
 
@@ -4168,10 +4168,12 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
   /*Logarithmic search.*/
   do {
     dcost = 0;
+    /*
     dcost += od_mv_est_refine(est, ref, 5, 2,
      OD_SQUARE_NSITES, OD_SQUARE_SITES);
     dcost += od_mv_est_refine(est, ref, 4, 2,
      OD_SQUARE_NSITES, OD_SQUARE_SITES);
+    */
     dcost += od_mv_est_refine(est, ref, 3, 2,
      OD_SQUARE_NSITES, OD_SQUARE_SITES);
   }
