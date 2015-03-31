@@ -4050,7 +4050,7 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int ref, int cost_thresh) {
   od_mv_est_update_fullpel_mvs(est, ref);
   do {
     dcost = od_mv_est_refine(est, ref, 2, 2,
-     OD_DIAMOND_NSITES, OD_DIAMOND_SITES);
+     OD_SQUARE_NSITES, OD_SQUARE_SITES);
   }
   while (dcost < cost_thresh);
   for (best_mv_res = mv_res = 2; mv_res-- > est->mv_res_min;) {
@@ -4065,7 +4065,7 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int ref, int cost_thresh) {
      (nhmvbs + 1)*(nvmvbs + 1));
     do {
       dcost = od_mv_est_refine(est, ref, mv_res, mv_res,
-       OD_DIAMOND_NSITES, OD_DIAMOND_SITES);
+       OD_SQUARE_NSITES, OD_SQUARE_SITES);
       subpel_cost += dcost;
     }
     while (dcost < cost_thresh);
