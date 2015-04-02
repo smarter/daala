@@ -4046,7 +4046,7 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int ref, int cost_thresh) {
     We could also try rounding the results after refinement, I guess.
     I'm not sure it makes much difference*/
   od_mv_est_update_fullpel_mvs(est, ref);
-  complexity = est->enc->complexity;
+  complexity = 7; /*est->enc->complexity;*/
   if (complexity >= OD_MC_SQUARE_SUBPEL_REFINEMENT_COMPLEXITY) {
     pattern_nsites = OD_SQUARE_NSITES;
     pattern = OD_SQUARE_SITES;
@@ -4174,7 +4174,7 @@ void od_mv_est(od_mv_est_ctx *est, int ref, int lambda) {
      more appropriate value, however that gives a PSNR improvement of less than
      0.01 dB, and requires almost twice as many iterations to achieve.*/
   cost_thresh = -nhmvbs*nvmvbs << OD_ERROR_SCALE;
-  complexity = est->enc->complexity;
+  complexity = 7; /*est->enc->complexity;*/
   if (complexity >= OD_MC_SQUARE_REFINEMENT_COMPLEXITY) {
     pattern_nsites = OD_SQUARE_NSITES;
     pattern = OD_SQUARE_SITES;
