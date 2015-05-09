@@ -2244,7 +2244,9 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
   best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Median predictor: (%i, %i)   Cost: %i", candx, candy, best_cost));
+#if 0
   od_mv_est_set_hit(est, candx, candy);
+#endif
   best_vec[0] = candx;
   best_vec[1] = candy;
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
@@ -2282,12 +2284,14 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
     for (ci = 0; ci < ncns; ci++) {
       candx = cands[ci][0];
       candy = cands[ci][1];
+#if 0
       if (od_mv_est_is_hit(est, candx, candy)) {
         OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
          "Set B predictor %i: (%i, %i) ...Skipping.", ci, candx, candy));
         continue;
       }
       od_mv_est_set_hit(est, candx, candy);
+#endif
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
       if (animating) {
         od_img_draw_line(&state->vis_img, x0, y0,
@@ -2328,6 +2332,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
       for (ci = 0; ci < 5; ci++) {
         candx = cands[ci][0];
         candy = cands[ci][1];
+#if 0
         if (od_mv_est_is_hit(est, candx, candy)) {
           OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
            "Set C predictor %i: (%i, %i) ...Skipping.", ci, candx, candy));
@@ -2335,6 +2340,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
         }
         /*if (od_mv_est_is_hit(est, candx, candy)) continue;*/
         od_mv_est_set_hit(est, candx, candy);
+#endif
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
         if (animating) {
           od_img_draw_line(&state->vis_img, x0, y0,
@@ -2387,6 +2393,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
              || candy < mvymin || candy > mvymax)) {
               continue;
             }
+#if 0
             if (od_mv_est_is_hit(est, candx, candy)) {
               OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
                "Pattern search %i: (%i, %i) ...Skipping.",
@@ -2394,6 +2401,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy) {
               continue;
             }
             od_mv_est_set_hit(est, candx, candy);
+#endif
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
             if (animating) {
               od_img_draw_line(&state->vis_img, x0, y0,
