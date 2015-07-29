@@ -176,8 +176,8 @@ static int od_enc_init(od_enc_ctx *enc, const daala_info *info) {
     enc->quality[i] = 10;
   }
   enc->complexity = 7;
-  enc->use_activity_masking = 1;
-  enc->qm = OD_HVS_QM;
+  enc->use_activity_masking = 0;
+  enc->qm = OD_FLAT_QM;
   enc->use_haar_wavelet = OD_USE_HAAR_WAVELET;
   enc->mvest = od_mv_est_alloc(enc);
   if (OD_UNLIKELY(!enc->mvest)) {
@@ -282,7 +282,7 @@ int daala_encode_ctl(daala_enc_ctx *enc, int req, void *buf, size_t buf_sz) {
       OD_ASSERT(enc);
       OD_ASSERT(buf);
       OD_ASSERT(buf_sz == sizeof(enc->use_activity_masking));
-      enc->use_activity_masking = !!*(const int *)buf;
+      enc->use_activity_masking = 0;
       return OD_SUCCESS;
     }
     case OD_SET_QM: {
@@ -294,7 +294,7 @@ int daala_encode_ctl(daala_enc_ctx *enc, int req, void *buf, size_t buf_sz) {
       if (qm < OD_FLAT_QM || qm > OD_HVS_QM) {
           return OD_EINVAL;
       }
-      enc->qm = qm;
+      enc->qm = OD_FLAT_QM;
       return OD_SUCCESS;
     }
     case OD_SET_MV_RES_MIN:
