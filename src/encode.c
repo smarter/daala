@@ -1297,8 +1297,8 @@ static int od_encode_recursive(daala_enc_ctx *enc, od_mb_enc_ctx *ctx,
         for (j = 0; j < n; j++) split[n*i + j] = ctx->c[bo + i*w + j];
       }
       rate_split = od_ec_enc_tell_frac(&enc->ec) - tell;
-      dist_split = od_compute_dist(enc, c_orig, split, n, bs, 1);
-      dist_nosplit = od_compute_dist(enc, c_orig, nosplit, n, bs, 1);
+      dist_split = od_compute_dist(enc, c_orig, split, n, bs, 0);
+      dist_nosplit = od_compute_dist(enc, c_orig, nosplit, n, bs, 0);
       lambda = od_bs_rdo_lambda(enc->quantizer[pli]);
       if (skip_split || dist_nosplit + lambda*rate_nosplit < dist_split
        + lambda*rate_split) {
