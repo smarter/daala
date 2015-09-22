@@ -516,7 +516,7 @@ int main(int argc, char **argv) {
   skip = 0;
   limit = -1;
   complexity = 7;
-  mc_use_chroma = 1;
+  mc_use_chroma = 0;
   mc_use_satd = 0;
   use_activity_masking = 1;
   use_dering = 1;

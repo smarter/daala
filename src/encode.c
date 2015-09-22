@@ -383,7 +383,7 @@ int daala_encode_ctl(daala_enc_ctx *enc, int req, void *buf, size_t buf_sz) {
       OD_RETURN_CHECK(buf, OD_EFAULT);
       OD_RETURN_CHECK(buf_sz == sizeof(mc_use_chroma), OD_EINVAL);
       mc_use_chroma = *(int *)buf;
-      if (mc_use_chroma) {
+      if (0 && mc_use_chroma) {
         enc->mvest->flags |= OD_MC_USE_CHROMA;
       }
       else {
