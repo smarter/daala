@@ -1350,6 +1350,29 @@ int od_mc_compute_sad_c(const unsigned char *src, int systride,
   return ret;
 }
 
+int od_mc_compute_sad_c_2(const unsigned char *src, int systride,
+ const unsigned char *ref, int dystride, int dxstride, int w, int h, int factor) {
+  const unsigned char *ref0;
+  int i;
+  int j;
+  int ret;
+  ret = 0;
+  ref0 = ref;
+  OD_ASSERT(factor == 1 || factor % 2 == 0);
+  h /= factor;
+  w /= factor;
+  for (j = 0; j < h; j++) {
+    ref = ref0;
+    for (i = 0; i < w; i++) {
+      ret += abs(ref[0] - src[factor*i]);
+      ref += factor*dxstride;
+    }
+    src += factor*systride;
+    ref0 += factor*dystride;
+  }
+  return ret;
+}
+
 int od_mc_compute_sad_4x4_xstride_1_c(const unsigned char *src, int systride,
  const unsigned char *ref, int dystride) {
   return od_mc_compute_sad_c(src, systride, ref, dystride, 1, 4, 4);
@@ -1738,6 +1761,56 @@ static int32_t od_enc_sad8(od_enc_ctx *enc, const unsigned char *p,
     ret = od_mc_compute_sad_c(src, iplane->ystride,
      p, pystride, pxstride, w, h);
   }
+  return ret;
+}
+
+static int32_t od_enc_sad8_2(od_enc_ctx *enc, const unsigned char *p,
+ int pystride, int pxstride, int pli, int x, int y, int log_blk_sz, int factor) {
+  od_state *state;
+  od_img_plane *iplane;
+  unsigned char *src;
+  int clipx;
+  int clipy;
+  int clipw;
+  int cliph;
+  int w;
+  int h;
+  int32_t ret;
+  state = &enc->state;
+  iplane = state->io_imgs[OD_FRAME_INPUT].planes + pli;
+  /*Compute the block dimensions in the target image plane.*/
+  x >>= iplane->xdec;
+  y >>= iplane->ydec;
+  w = 1 << (log_blk_sz - iplane->xdec);
+  h = 1 << (log_blk_sz - iplane->ydec);
+  /*Clip the block against the active picture region.*/
+  clipx = -x;
+  if (clipx > 0) {
+    w -= clipx;
+    p += clipx*pxstride;
+    x += clipx;
+  }
+  clipy = -y;
+  if (clipy > 0) {
+    h -= clipy;
+    p += clipy*pystride;
+    y += clipy;
+  }
+  clipw = ((state->info.pic_width + (1 << iplane->xdec) - 1) >> iplane->xdec)
+   - x;
+  w = OD_MINI(w, clipw);
+  cliph = ((state->info.pic_height + (1 << iplane->ydec) - 1) >> iplane->ydec)
+   - y;
+  h = OD_MINI(h, cliph);
+  /*OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
+   "[%i, %i]x[%i, %i]", x, y, w, h));*/
+  /*Compute the SAD.*/
+  src = iplane->data + y*iplane->ystride + x*iplane->xstride;
+
+  /*Default C implementation.*/
+  ret = od_mc_compute_sad_c_2(src, iplane->ystride,
+   p, pystride, pxstride, w, h, factor);
+
   return ret;
 }
 
@@ -2323,6 +2396,27 @@ static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
   return ret;
 }
 
+static int32_t od_mv_est_bma_sad8_2(od_mv_est_ctx *est,
+ int ref, int bx, int by, int mvx, int mvy, int log_mvb_sz,
+ int factor) {
+  od_state *state;
+  od_img_plane *iplane;
+  int32_t ret;
+  int refi;
+  int dx;
+  int dy;
+  state = &est->enc->state;
+  refi = state->ref_imgi[ref];
+  iplane = state->ref_imgs[refi].planes + 0;
+  OD_ASSERT(iplane->xdec == 0 && iplane->ydec == 0);
+  dx = bx + mvx;
+  dy = by + mvy;
+  ret = od_enc_sad8_2(est->enc, iplane->data + dy *iplane->ystride + dx,
+   iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN,
+   factor);
+  return ret;
+}
+
 /*Computes the SAD of a block with the given parameters.*/
 static int32_t od_mv_est_sad8(od_mv_est_ctx *est,
  int vx, int vy, int oc, int s, int log_mvb_sz) {
@@ -2771,6 +2865,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
         int sitei;
         int site;
         int b;
+        int factors[] = { 2, 1 };
+        int i;
+        for (i = 0; i < 2; i++) {
+        int factor = factors[i];
         /*Gradient descent pattern search.*/
         mvstate = 0;
         for (;;) {
@@ -2781,15 +2879,15 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
           nsites = OD_SEARCH_NSITES[mvstate][b];
           for (sitei = 0; sitei < nsites; sitei++) {
             site = pattern[sitei];
-            candx = best_vec[0] + OD_SITE_DX[site];
-            candy = best_vec[1] + OD_SITE_DY[site];
+            candx = best_vec[0] + factor*OD_SITE_DX[site];
+            candy = best_vec[1] + factor*OD_SITE_DY[site];
             /*For the large search patterns, our simple mechanism to move
                bounds checking out of the inner loop doesn't work (it would
                need 2 more bits, or 4 times as much table storage, and require
                4 extra compares, when there are often fewer than 4 sites).
               If the displacement is larger than +/-1 in any direction (which
                happens when site > 8), check the bounds explicitly.*/
-            if (site > 8 && (candx < mvxmin || candx > mvxmax
+            if ((candx < mvxmin || candx > mvxmax
              || candy < mvymin || candy > mvymax)) {
               continue;
             }
@@ -2799,6 +2897,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
                site, candx, candy));
               continue;
             }
+            OD_ASSERT(!(est->flags & OD_MC_USE_CHROMA));
             od_mv_est_set_hit(est, candx, candy);
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
             if (animating) {
@@ -2806,8 +2905,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
                x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
             }
 #endif
-            sad = od_mv_est_bma_sad8(est,
-             ref, bx, by, candx, candy, log_mvb_sz);
+            sad = od_mv_est_bma_sad8_2(est,
+             ref, bx, by, candx, candy, log_mvb_sz, factor)*factor*factor;
+            /*sad = od_mv_est_bma_sad8(est,
+               ref, bx, by, candx, candy, log_mvb_sz);*/
             rate = od_mv_est_cand_bits(est, equal_mvs,
              candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
             cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2822,9 +2923,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
             }
           }
           mvstate = OD_SEARCH_STATES[mvstate][best_site];
-          best_vec[0] += OD_SITE_DX[best_site];
-          best_vec[1] += OD_SITE_DY[best_site];
+          best_vec[0] += factor*OD_SITE_DX[best_site];
+          best_vec[1] += factor*OD_SITE_DY[best_site];
           if (mvstate == OD_SEARCH_STATE_DONE) break;
+        }
         }
       }
     }
