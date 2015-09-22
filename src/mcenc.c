@@ -51,7 +51,7 @@ typedef int od_pattern[8];
 
 /*The number of bits to reduce chroma SADs by, if used.*/
 #define OD_MC_CHROMA_SCALE (2)
-#define OD_MC_CHROMA_LAMBDA_SCALE (1)
+#define OD_MC_CHROMA_LAMBDA_SCALE (0)
 
 /*The subdivision level of a MV in the mesh, given its position
    (mod OD_MVB_DELTA0).*/
