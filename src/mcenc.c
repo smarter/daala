@@ -2492,11 +2492,12 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   od_mv_node *mv;
   const od_mv_node *cneighbors[4];
   const od_mv_node *pneighbors[4];
+  const od_mv_node *zneighbors[4];
   int32_t t2;
   int32_t best_sad;
   int32_t best_cost;
   int best_rate;
-  int cands[6][2];
+  int cands[9][2];
   int best_vec[2];
   int nhmvbs;
   int nvmvbs;
@@ -2604,6 +2605,16 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      est->mvs[vy] + vx + mvb_sz : &ZERO_NODE;
     pneighbors[3] = vy + mvb_sz <= nvmvbs ?
      est->mvs[vy + OD_MVB_DELTA0] + vx : &ZERO_NODE;
+
+    /*zneighbors[0] = cneighbors[0];*/
+    zneighbors[0] = vy >= mvb_sz && vx >= mvb_sz ?
+       est->mvs[vy - mvb_sz] + vx - mvb_sz : &ZERO_NODE;
+    zneighbors[1] = vy >= mvb_sz && vx + mvb_sz <= nhmvbs ?
+     est->mvs[vy - mvb_sz] + vx + mvb_sz : &ZERO_NODE;
+    zneighbors[2] = vy + mvb_sz <= nvmvbs && vx >= mvb_sz ?
+     est->mvs[vy + mvb_sz] + vx - mvb_sz : &ZERO_NODE;
+    zneighbors[3] = vy + mvb_sz <= nvmvbs && vx + mvb_sz <= nhmvbs ?
+     est->mvs[vy + mvb_sz] + vx + mvb_sz : &ZERO_NODE;
   }
   else {
     if (level & 1) {
@@ -2628,6 +2639,15 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       else cneighbors[2] = pneighbors[2];
       if (vy > 0 && vy + mvb_sz > ((vy + OD_MVB_MASK) & ~OD_MVB_MASK)) ncns--;
       else cneighbors[ncns - 1] = pneighbors[3];
+
+      zneighbors[0] = vy >= mvb_sz && vx >= mvb_sz ?
+       est->mvs[vy - mvb_sz] + vx - mvb_sz : &ZERO_NODE;
+      zneighbors[1] = vy >= mvb_sz && vx + mvb_sz <= nhmvbs ?
+       est->mvs[vy - mvb_sz] + vx + mvb_sz : &ZERO_NODE;
+      zneighbors[2] = vy + mvb_sz <= nvmvbs && vx >= mvb_sz ?
+       est->mvs[vy + mvb_sz] + vx - mvb_sz : &ZERO_NODE;
+      zneighbors[3] = vy + mvb_sz <= nvmvbs && vx + mvb_sz <= nhmvbs ?
+       est->mvs[vy + mvb_sz] + vx + mvb_sz : &ZERO_NODE;
     }
   }
   /*Spatially correlated predictors (from the current frame):*/
@@ -2723,15 +2743,25 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
         cands[ci][1] =
          OD_CLAMPI(mvymin, pneighbors[ci]->bma_mvs[1][ref][1], mvymax);
       }
+      for (ci = 0; ci < 4; ci++) {
+        cands[4+ci][0] = 0;
+        cands[4+ci][1] = 0;
+        if (!(level & 1)) {
+          cands[4+ci][0] =
+           OD_CLAMPI(mvxmin, zneighbors[ci]->bma_mvs[1][ref][0], mvxmax);
+          cands[4+ci][1] =
+           OD_CLAMPI(mvymin, zneighbors[ci]->bma_mvs[1][ref][1], mvymax);
+        }
+      }
       /*The constant acceleration predictor:*/
-      cands[4][0] = OD_CLAMPI(mvxmin,
+      cands[8][0] = OD_CLAMPI(mvxmin,
        OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][0]*est->mvapw[ref][0]
        - mv->bma_mvs[2][ref][0]*est->mvapw[ref][1], 16, 0x8000), mvxmax);
-      cands[4][1] = OD_CLAMPI(mvymin,
+      cands[8][1] = OD_CLAMPI(mvymin,
        OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
        - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 16, 0x8000), mvymax);
       /*Examine the candidates in Set C.*/
-      for (ci = 0; ci < 5; ci++) {
+      for (ci = 0; ci < 9; ci++) {
         candx = cands[ci][0];
         candy = cands[ci][1];
         if (od_mv_est_is_hit(est, candx, candy)) {
