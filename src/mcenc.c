@@ -2623,6 +2623,13 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       pneighbors[2] = est->mvs[vy + mvb_sz] + vx - mvb_sz;
       pneighbors[3] = est->mvs[vy + mvb_sz] + vx + mvb_sz;
       memcpy(cneighbors, pneighbors, sizeof(cneighbors));
+
+      zneighbors[0] = vy >= mvb_sz ? est->mvs[vy - mvb_sz] + vx : &ZERO_NODE;
+      zneighbors[1] = vx >= mvb_sz ? est->mvs[vy] + vx - mvb_sz : &ZERO_NODE;
+      zneighbors[2] = vx + mvb_sz <= nhmvbs ?
+       est->mvs[vy] + vx + mvb_sz : &ZERO_NODE;
+      zneighbors[3] = vy + mvb_sz <= nvmvbs ?
+       est->mvs[vy + mvb_sz] + vx : &ZERO_NODE;
     }
     else {
       pneighbors[0] = vy >= mvb_sz ? est->mvs[vy - mvb_sz] + vx : &ZERO_NODE;
@@ -2746,12 +2753,12 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       for (ci = 0; ci < 4; ci++) {
         cands[4+ci][0] = 0;
         cands[4+ci][1] = 0;
-        if (!(level & 1)) {
+        /*if (!(level & 1)) {*/
           cands[4+ci][0] =
            OD_CLAMPI(mvxmin, zneighbors[ci]->bma_mvs[1][ref][0], mvxmax);
           cands[4+ci][1] =
            OD_CLAMPI(mvymin, zneighbors[ci]->bma_mvs[1][ref][1], mvymax);
-        }
+         /*}*/
       }
       /*The constant acceleration predictor:*/
       cands[8][0] = OD_CLAMPI(mvxmin,
