@@ -2854,6 +2854,43 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Finished. Best vector: (%i, %i)  Best cost %i",
    best_vec[0], best_vec[1], best_cost));
+
+  {
+    int dx, dy, best_dx, best_dy;
+    int sad, rate, cost;
+    best_dx = 0;
+    best_dy = 0;
+    for (dy = -1; dy < 2; dy++) {
+      for (dx = -1; dx < 2; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        candx = best_vec[0] + dx;
+        candy = best_vec[1] + dy;
+        if (candx < mvxmin || candx > mvxmax
+         || candy < mvymin || candy > mvymax) {
+          continue;
+        }
+        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+        rate = od_mv_est_cand_bits(est, equal_mvs,
+         candx, candy, pred[0], pred[1], ref, ref_pred);
+        cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
+        if (cost < best_cost) {
+          best_sad = sad;
+          best_rate = rate;
+          best_cost = cost;
+          best_dx = dx;
+          best_dy = dy;
+        }
+      }
+    }
+    if (best_dx != 0 || best_dy != 0) {
+      OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
+       "Finished refinement. Best vector: (%i, %i)  Best cost %i",
+       best_vec[0] + best_dx, best_vec[1] + best_dy, best_cost));
+      best_vec[0] += best_dx;
+      best_vec[1] += best_dy;
+    }
+  }
+
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
   if (animating) {
     char iter_label[16];
