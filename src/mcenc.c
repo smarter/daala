@@ -2295,7 +2295,7 @@ static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
   dx = bx + mvx;
   dy = by + mvy;
   ret = od_enc_sad8(est->enc, iplane->data + dy *iplane->ystride + dx,
-   iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN);
+   iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN + 1);
   if (est->flags & OD_MC_USE_CHROMA) {
     int pli;
     unsigned char *ref_img;
@@ -2317,7 +2317,7 @@ static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
          MC block.*/
       ret += od_enc_sad8(est->enc, state->mc_buf[4],
        1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec),
-       1, pli, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN) >> OD_MC_CHROMA_SCALE;
+       1, pli, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN + 1) >> OD_MC_CHROMA_SCALE;
     }
   }
   return ret;
