@@ -2698,14 +2698,14 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      [bxmin, bmax) x [bymin, bymax), and MVs within that area must point no
      farther than OD_UMV_CLAMP pixels outside of the frame.*/
   bxmin = OD_MAXI(bx - (mvb_sz << OD_LOG_MVBSIZE_MIN), 0);
-  mvxmin = OD_MAXI(bxmin - OD_MC_SEARCH_RANGE, -OD_UMV_CLAMP) - bxmin;
+  mvxmin = OD_MAXI(bxmin - OD_MC_SEARCH_RANGE/2, -OD_UMV_CLAMP) - bxmin;
   bxmax = OD_MINI(bx + (mvb_sz << OD_LOG_MVBSIZE_MIN), state->frame_width);
-  mvxmax = OD_MINI(bxmax + OD_MC_SEARCH_RANGE - 1,
+  mvxmax = OD_MINI(bxmax + OD_MC_SEARCH_RANGE/2 - 1,
    state->frame_width + OD_UMV_CLAMP) - bxmax;
   bymin = OD_MAXI(by - (mvb_sz << OD_LOG_MVBSIZE_MIN), 0);
-  mvymin = OD_MAXI(bymin - OD_MC_SEARCH_RANGE, -OD_UMV_CLAMP) - bymin;
+  mvymin = OD_MAXI(bymin - OD_MC_SEARCH_RANGE/2, -OD_UMV_CLAMP) - bymin;
   bymax = OD_MINI(by + (mvb_sz << OD_LOG_MVBSIZE_MIN), state->frame_height);
-  mvymax = OD_MINI(bymax + OD_MC_SEARCH_RANGE - 1,
+  mvymax = OD_MINI(bymax + OD_MC_SEARCH_RANGE/2 - 1,
    state->frame_height + OD_UMV_CLAMP) - bymax;
 
   mvxmin *= 2;
