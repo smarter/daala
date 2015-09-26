@@ -2592,8 +2592,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   nhmvbs = state->nhmvbs;
   nvmvbs = state->nvmvbs;
   equal_mvs = od_state_get_predictor(state, pred, vx, vy, level, 2, ref);
-  candx = OD_CLAMPI(mvxmin, 2*OD_DIV2_RE(pred[0]), mvxmax);
-  candy = OD_CLAMPI(mvymin, 2*OD_DIV2_RE(pred[1]), mvymax);
+  candx = OD_CLAMPI(mvxmin, pred[0], mvxmax);
+  candy = OD_CLAMPI(mvymin, pred[1], mvymax);
   ref_pred = od_mc_get_ref_predictor(state, vx, vy, level);
   /*Find additional candidates.*/
   if (level == 0) {
@@ -2736,11 +2736,11 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       }
       /*The constant acceleration predictor:*/
       cands[4][0] = OD_CLAMPI(mvxmin,
-       2*OD_DIV_ROUND_POW2((mv->bma_mvs[1][ref][0] >> 1)*est->mvapw[ref][0]
-        - (mv->bma_mvs[2][ref][0] >> 1)*est->mvapw[ref][1], 16, 0x8000), mvxmax);
+       OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][0]*est->mvapw[ref][0]
+        - mv->bma_mvs[2][ref][0]*est->mvapw[ref][1], 16, 0x8000), mvxmax);
       cands[4][1] = OD_CLAMPI(mvymin,
-       2*OD_DIV_ROUND_POW2((mv->bma_mvs[1][ref][1] >> 1)*est->mvapw[ref][0]
-        - (mv->bma_mvs[2][ref][1] >> 1)*est->mvapw[ref][1], 16, 0x8000), mvymax);
+       OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
+        - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 16, 0x8000), mvymax);
       /*Examine the candidates in Set C.*/
       for (ci = 0; ci < 5; ci++) {
         candx = cands[ci][0];
@@ -2782,6 +2782,17 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
         int sitei;
         int site;
         int b;
+        /*Round MV to fullpel before starting the search.*/
+        candx = (best_vec[0] >> 1) << 1;
+        candy = (best_vec[1] >> 1) << 1;
+        if (candx != best_vec[0] || candy != best_vec[1]) {
+          best_vec[0] = candx;
+          best_vec[1] = candy;
+          best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+          best_rate = od_mv_est_cand_bits(est, equal_mvs,
+           candx, candy, pred[0], pred[1], ref, ref_pred);
+          best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
+        }
         /*Gradient descent pattern search.*/
         mvstate = 0;
         for (;;) {
@@ -2874,8 +2885,6 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      "Found a better SAD then previous best."));
     mv->bma_mvs[0][ref][0] = best_vec[0];
     mv->bma_mvs[0][ref][1] = best_vec[1];
-    OD_ASSERT((best_vec[0] & 1) == 0);
-    OD_ASSERT((best_vec[1] & 1) == 0);
     mvg->mv[0] = best_vec[0] << 2;
     mvg->mv[1] = best_vec[1] << 2;
     mvg->ref = ref;
@@ -5987,8 +5996,8 @@ void od_mv_est_update_fullpel_mvs(od_mv_est_ctx *est) {
       mvg = state->mv_grid[vy] + vx;
       if (!mvg->valid) continue;
       mv = est->mvs[vy] + vx;
-      mv->bma_mvs[0][mvg->ref][0] = 2*(mvg->mv[0] >> 3);
-      mv->bma_mvs[0][mvg->ref][1] = 2*(mvg->mv[1] >> 3);
+      mv->bma_mvs[0][mvg->ref][0] = mvg->mv[0] >> 2;
+      mv->bma_mvs[0][mvg->ref][1] = mvg->mv[1] >> 2;
     }
   }
 }
