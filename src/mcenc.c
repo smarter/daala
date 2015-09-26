@@ -2275,7 +2275,7 @@ static void od_mv_est_log_pred(od_mv_est_ctx *est, int vx, int vy,
 # define OD_MV_EST_LOG_PRED(est, vx, vy, mv_res)
 #endif
 
-/*Computes the SAD of a whole-pel BMA block with the given parameters.*/
+/*Computes the SAD of a half-pel BMA block with the given parameters.*/
 /*Note: The od_enc_sad8() is now always called with xstride = 1,
    because MC ref image is NOT upsampled at frame level.*/
 static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
@@ -2285,40 +2285,45 @@ static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
   od_img_plane *iplane;
   int32_t ret;
   int refi;
-  int dx;
-  int dy;
+  /*int dx;
+    int dy;*/
+  int planes;
+  int pli;
+  unsigned char *ref_img;
+  planes = (est->flags & OD_MC_USE_CHROMA) ? 3 : 1;
   enc = est->enc;
   state = &enc->state;
   refi = state->ref_imgi[ref];
   iplane = state->ref_imgs[refi].planes + 0;
   OD_ASSERT(iplane->xdec == 0 && iplane->ydec == 0);
+  /*
   dx = bx + mvx;
   dy = by + mvy;
   ret = od_enc_sad8(est->enc, iplane->data + dy *iplane->ystride + dx,
    iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN);
-  if (est->flags & OD_MC_USE_CHROMA) {
-    int pli;
-    unsigned char *ref_img;
-    for (pli = 1; pli < enc->input_img.nplanes; pli++) {
-      iplane = state->ref_imgs[refi].planes + pli;
-      OD_ASSERT(((bx + (1 << iplane->xdec) - 1) & ~((1 << iplane->xdec) - 1))
-       == bx);
-      OD_ASSERT(((by + (1 << iplane->ydec) - 1) & ~((1 << iplane->ydec) - 1))
-       == by);
-      /*If the input chroma plane is sub-sampled, then the candidate block with
-         subpel position for BMA search is interpolated at block level.*/
-      ref_img = iplane->data + (by >> iplane->ydec)*iplane->ystride
-       + (bx >> iplane->xdec);
-      od_mc_predict1fmv8_c(state->mc_buf[4], ref_img, iplane->ystride,
-       mvx << (3 - iplane->xdec), mvy << (3 - iplane->ydec),
-       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
-       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
-      /*Then, calculate SAD between a target block and the subpel interpolated
-         MC block.*/
-      ret += od_enc_sad8(est->enc, state->mc_buf[4],
-       1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec),
-       1, pli, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN) >> OD_MC_CHROMA_SCALE;
-    }
+  */
+  ret = 0;
+
+  for (pli = 0; pli < planes; pli++) {
+    iplane = state->ref_imgs[refi].planes + pli;
+    OD_ASSERT(((bx + (1 << iplane->xdec) - 1) & ~((1 << iplane->xdec) - 1))
+     == bx);
+    OD_ASSERT(((by + (1 << iplane->ydec) - 1) & ~((1 << iplane->ydec) - 1))
+     == by);
+    /*If the input chroma plane is sub-sampled, then the candidate block with
+       subpel position for BMA search is interpolated at block level.*/
+    ref_img = iplane->data + (by >> iplane->ydec)*iplane->ystride
+     + (bx >> iplane->xdec);
+    od_mc_predict1fmv8_c(state->mc_buf[4], ref_img, iplane->ystride,
+     mvx << (2 - iplane->xdec), mvy << (2 - iplane->ydec),
+     log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
+     log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
+    /*Then, calculate SAD between a target block and the subpel interpolated
+       MC block.*/
+    ret += od_enc_sad8(est->enc, state->mc_buf[4],
+     1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec),
+     1, pli, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN)
+     >> (pli > 0 ? OD_MC_CHROMA_SCALE : 0);
   }
   return ret;
 }
@@ -2644,7 +2649,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
   }
 #endif
-  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1, log_mvb_sz);
   best_rate = od_mv_est_cand_bits(est, equal_mvs,
    candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
   best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
@@ -2700,7 +2705,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
          x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
       }
 #endif
-      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1, candy << 1, log_mvb_sz);
       rate = od_mv_est_cand_bits(est, equal_mvs,
        candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
       cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2747,7 +2752,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
            x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
         }
 #endif
-        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx << 1 , candy << 1, log_mvb_sz);
         rate = od_mv_est_cand_bits(est, equal_mvs,
          candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
         cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2807,7 +2812,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
             }
 #endif
             sad = od_mv_est_bma_sad8(est,
-             ref, bx, by, candx, candy, log_mvb_sz);
+             ref, bx, by, candx << 1, candy << 1, log_mvb_sz);
             rate = od_mv_est_cand_bits(est, equal_mvs,
              candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
             cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
