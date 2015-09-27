@@ -2813,7 +2813,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
                4 extra compares, when there are often fewer than 4 sites).
               If the displacement is larger than +/-1 in any direction (which
                happens when site > 8), check the bounds explicitly.*/
-            if (site > 8 && (candx < mvxmin || candx > mvxmax
+            if (/*site > 8 &&*/ (candx < mvxmin || candx > mvxmax
              || candy < mvymin || candy > mvymax)) {
               continue;
             }
