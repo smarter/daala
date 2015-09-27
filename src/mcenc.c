@@ -2934,6 +2934,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
         int site;
         int b;
         /*Round MV to fullpel before starting the search.*/
+        /*
         candx = (best_vec[0] >> 1) << 1;
         candy = (best_vec[1] >> 1) << 1;
         if (candx != best_vec[0] || candy != best_vec[1]) {
@@ -2944,6 +2945,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
            candx, candy, pred[0], pred[1], ref, ref_pred);
           best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
         }
+        */
         /*Gradient descent pattern search.*/
         mvstate = 0;
         for (;;) {
