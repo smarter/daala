@@ -4368,15 +4368,13 @@ static int od_mv_est_get_boundary_case(od_state *state,
      [bxmin, bmax) x [bymin, bymax), and MVs within that area must point no
      farther than OD_UMV_PADDING pixels outside of the frame.*/
   bxmin = OD_MAXI(bx - blk_sz, 0);
-  mvxmin = (OD_MAXI(bxmin - OD_MC_SEARCH_RANGE, -OD_UMV_CLAMP) - bxmin) << 3;
+  mvxmin = (-OD_UMV_CLAMP - bxmin) << 3;
   bxmax = OD_MINI(bx + blk_sz, state->frame_width);
-  mvxmax = (OD_MINI(bxmax + OD_MC_SEARCH_RANGE - 1,
-   state->frame_width + OD_UMV_CLAMP) - bxmax) << 3;
+  mvxmax = (state->frame_width + OD_UMV_CLAMP - bxmax) << 3;
   bymin = OD_MAXI(by - blk_sz, 0);
-  mvymin = (OD_MAXI(bymin - OD_MC_SEARCH_RANGE, -OD_UMV_CLAMP) - bymin) << 3;
+  mvymin = (-OD_UMV_CLAMP - bymin) << 3;
   bymax = OD_MINI(by + blk_sz, state->frame_height);
-  mvymax = (OD_MINI(bymax + OD_MC_SEARCH_RANGE - 1,
-   state->frame_height + OD_UMV_CLAMP) - bymax) << 3;
+  mvymax = (state->frame_height + OD_UMV_CLAMP - bymax) << 3;
   return (dx - dsz < mvxmin) | (dx + dsz > mvxmax) << 1 |
    (dy - dsz < mvymin) << 2 | (dy  + dsz > mvymax) << 3;
 }
