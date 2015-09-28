@@ -1350,6 +1350,7 @@ int od_mc_compute_sad_c(const unsigned char *src, int systride,
   return ret;
 }
 
+#if 0
 int od_mc_compute_sad_c_2(const unsigned char *src, int systride,
  const unsigned char *ref, int dystride, int dxstride, int w, int h, int factor) {
   const unsigned char *ref0;
@@ -1372,6 +1373,34 @@ int od_mc_compute_sad_c_2(const unsigned char *src, int systride,
   }
   return ret;
 }
+#else
+int od_mc_compute_sad_c_2(const unsigned char *src, int systride,
+ const unsigned char *ref, int dystride, int dxstride, int w, int h, int factor) {
+  int i;
+  int j;
+  int k;
+  int l;
+  int ret;
+  ret = 0;
+  OD_ASSERT(factor == 1 || factor % 2 == 0);
+  for (i = 0; i < h; i += factor) {
+    for (j = 0; j < w; j += factor) {
+      const unsigned char *src_b = &src[systride*i + j];
+      const unsigned char *ref_b = &ref[dystride*i + j*dxstride];
+      int avg1 = 0;
+      int avg2 = 0;
+      for (k = 0; k < factor; k++) {
+        for (l = 0; l < factor; l++) {
+          avg1 += src_b[systride*k + l];
+          avg2 += ref_b[dystride*k + l*dxstride];
+        }
+      }
+      ret += abs(avg1 - avg2);
+    }
+  }
+  return ret;
+}
+#endif
 
 int od_mc_compute_sad_4x4_xstride_1_c(const unsigned char *src, int systride,
  const unsigned char *ref, int dystride) {
@@ -2414,7 +2443,7 @@ static int32_t od_mv_est_bma_sad8_2(od_mv_est_ctx *est,
   ret = od_enc_sad8_2(est->enc, iplane->data + dy *iplane->ystride + dx,
    iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN,
    factor);
-  return ret*factor*factor;
+  return ret;
 }
 
 /*Computes the SAD of a block with the given parameters.*/
