@@ -1777,7 +1777,7 @@ static int32_t od_enc_sad8_2(od_enc_ctx *enc, const unsigned char *p,
   int h;
   int32_t ret;
   state = &enc->state;
-  iplane = state->io_imgs[OD_FRAME_INPUT].planes + pli;
+  iplane = enc->input_img.planes + pli;
   /*Compute the block dimensions in the target image plane.*/
   x >>= iplane->xdec;
   y >>= iplane->ydec;
@@ -2414,7 +2414,7 @@ static int32_t od_mv_est_bma_sad8_2(od_mv_est_ctx *est,
   ret = od_enc_sad8_2(est->enc, iplane->data + dy *iplane->ystride + dx,
    iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN,
    factor);
-  return ret;
+  return ret*factor*factor;
 }
 
 /*Computes the SAD of a block with the given parameters.*/
@@ -2578,8 +2578,8 @@ void od_mv_est_check_rd_state(od_mv_est_ctx *est, int mv_res) {
 static const unsigned char OD_YCbCr_MVCAND[3] = { 210, 16, 214 };
 #endif
 
-static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
- int must_update) {
+static void od_mv_est_init_mv_2(od_mv_est_ctx *est, int ref, int vx, int vy,
+ int must_update, int factor, int *extra_cand) {
   static const od_mv_node ZERO_NODE;
   od_state *state;
   od_mv_grid_pt *mvg;
@@ -2738,7 +2738,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
   }
 #endif
-  best_sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+  best_sad = od_mv_est_bma_sad8_2(est, ref, bx, by, candx, candy, log_mvb_sz, factor);
   best_rate = od_mv_est_cand_bits(est, equal_mvs,
    candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
   best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
@@ -2794,7 +2794,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
          x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
       }
 #endif
-      sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+      sad = od_mv_est_bma_sad8_2(est, ref, bx, by, candx, candy, log_mvb_sz, factor);
       rate = od_mv_est_cand_bits(est, equal_mvs,
        candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
       cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2824,8 +2824,12 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       cands[4][1] = OD_CLAMPI(mvymin,
        OD_DIV_ROUND_POW2(mv->bma_mvs[1][ref][1]*est->mvapw[ref][0]
        - mv->bma_mvs[2][ref][1]*est->mvapw[ref][1], 16, 0x8000), mvymax);
+
+      cands[5][0] = extra_cand[0];
+      cands[5][1] = extra_cand[1];
+
       /*Examine the candidates in Set C.*/
-      for (ci = 0; ci < 5; ci++) {
+      for (ci = 0; ci < 6; ci++) {
         candx = cands[ci][0];
         candy = cands[ci][1];
         if (od_mv_est_is_hit(est, candx, candy)) {
@@ -2841,7 +2845,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
            x0 + (candx << 1), y0 + (candy << 1), OD_YCbCr_MVCAND);
         }
 #endif
-        sad = od_mv_est_bma_sad8(est, ref, bx, by, candx, candy, log_mvb_sz);
+        sad = od_mv_est_bma_sad8_2(est, ref, bx, by, candx, candy, log_mvb_sz, factor);
         rate = od_mv_est_cand_bits(est, equal_mvs,
          candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
         cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
@@ -2865,10 +2869,6 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
         int sitei;
         int site;
         int b;
-        int factors[] = { 2, 1 };
-        int i;
-        for (i = 0; i < 2; i++) {
-        int factor = factors[i];
         /*Gradient descent pattern search.*/
         mvstate = 0;
         for (;;) {
@@ -2906,7 +2906,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
             }
 #endif
             sad = od_mv_est_bma_sad8_2(est,
-             ref, bx, by, candx, candy, log_mvb_sz, factor)*factor*factor;
+             ref, bx, by, candx, candy, log_mvb_sz, factor);
             /*sad = od_mv_est_bma_sad8(est,
                ref, bx, by, candx, candy, log_mvb_sz);*/
             rate = od_mv_est_cand_bits(est, equal_mvs,
@@ -2926,7 +2926,6 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
           best_vec[0] += factor*OD_SITE_DX[best_site];
           best_vec[1] += factor*OD_SITE_DY[best_site];
           if (mvstate == OD_SEARCH_STATE_DONE) break;
-        }
         }
       }
     }
@@ -2958,11 +2957,14 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     od_state_dump_img(state, &est->enc->vis_img, iter_label);
   }
 #endif
+
   /*previous_cost is our previous best cost from a previous pass of phase 1.*/
   previous_cost = (mv->bma_sad << OD_ERROR_SCALE) + mv->mv_rate*est->lambda;
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
+    extra_cand[0] = best_vec[0];
+    extra_cand[1] = best_vec[1];
     mv->bma_mvs[0][ref][0] = best_vec[0];
     mv->bma_mvs[0][ref][1] = best_vec[1];
     mvg->mv[0] = best_vec[0] << 3;
@@ -2990,6 +2992,17 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       }
     }
 #endif
+  }
+}
+
+static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
+ int must_update) {
+  int factors[] = { 2, 1 };
+  int extra_cand[] = { 0, 0 };
+  int i;
+  for (i = 0; i < 2; i++) {
+    int factor = factors[i];
+    od_mv_est_init_mv_2(est, ref, vx, vy, must_update, factor, extra_cand);
   }
 }
 
