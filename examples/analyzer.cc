@@ -771,6 +771,24 @@ void TestPanel::setShowNoRef(bool show_noref) {
   this->show_noref = show_noref;
 }
 
+void printAccounting(FILE *fp, od_accounting *acct) {
+  int i;
+  int total_bits_q3[MAX_SYMBOL_TYPES];
+  for (i = 0; i < MAX_SYMBOL_TYPES; i++) {
+    total_bits_q3[i] = 0;
+  }
+  for (i = 0; i < acct->nb_syms; i++) {
+    od_acct_symbol *s;
+    s = &acct->syms[i];
+    total_bits_q3[s->id] += s->bits_q3;
+    /*fprintf(fp, "%i: %i %i %i %i %i %s\n", i, s->x, s->y, s->layer, s->level,
+     s->bits_q3, acct->dict.str[s->id]);*/
+  }
+  for (i = 0; i < acct->dict.nb_str; i++) {
+    fprintf(fp, "%s %i\n", acct->dict.str[i], total_bits_q3[i]);
+  }
+}
+
 void TestPanel::computeBitsPerPixel() {
   int i, j;
   double bpp_total;
@@ -780,6 +798,7 @@ void TestPanel::computeBitsPerPixel() {
     }
   }
   bpp_total = 0;
+  printAccounting(stdout, acct);
   for (i = 0; i < acct->nb_syms; i++) {
     od_acct_symbol *s;
     s = &acct->syms[i];
