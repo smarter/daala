@@ -2967,6 +2967,51 @@ static void od_mv_est_init_mv_impl(od_mv_est_ctx *est, int ref, int vx, int vy,
   }
 #endif
 
+  if (factor != 1) {
+    int dx, dy, best_dx, best_dy;
+    int sad, rate, cost;
+
+    factor /= 2;
+
+    best_sad = od_mv_est_bma_sad(est, ref, bx, by, candx, candy, log_mvb_sz, factor);
+    best_rate = od_mv_est_cand_bits(est, equal_mvs,
+     candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
+    best_cost = (best_sad << OD_ERROR_SCALE) + best_rate*est->lambda;
+
+    best_dx = 0;
+    best_dy = 0;
+    for (dy = -1; dy < 2; dy++) {
+      for (dx = -1; dx < 2; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        candx = best_vec[0] + dx;
+        candy = best_vec[1] + dy;
+        if (candx < mvxmin || candx > mvxmax
+         || candy < mvymin || candy > mvymax) {
+          continue;
+        }
+        sad = od_mv_est_bma_sad(est, ref, bx, by, candx, candy, log_mvb_sz, factor);
+        rate = od_mv_est_cand_bits(est, equal_mvs,
+         candx << 1 , candy << 1, pred[0], pred[1], ref, ref_pred);
+        cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
+        if (cost < best_cost) {
+          best_sad = sad;
+          best_rate = rate;
+          best_cost = cost;
+          best_dx = dx;
+          best_dy = dy;
+        }
+      }
+    }
+    if (best_dx != 0 || best_dy != 0) {
+      OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
+       "Finished refinement. Best vector: (%i, %i)  Best cost %i",
+       best_vec[0] + best_dx, best_vec[1] + best_dy, best_cost));
+      best_vec[0] += best_dx;
+      best_vec[1] += best_dy;
+    }
+  }
+
+
   extra_cand[0] = best_vec[0];
   extra_cand[1] = best_vec[1];
 
@@ -3010,7 +3055,8 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   int factors[] = { 2, 1 };
   int extra_cand[] = { 0, 0 };
   int i;
-  for (i = 0; i < sizeof(factors)/sizeof(factors[0]); i++) {
+  int length = sizeof(factors)/sizeof(factors[0]);
+  for (i = 0; i < length; i++) {
     int factor = factors[i];
     od_mv_est_init_mv_impl(est, ref, vx, vy, must_update, factor, extra_cand);
   }
