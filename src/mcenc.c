@@ -3052,7 +3052,7 @@ static void od_mv_est_init_mv_impl(od_mv_est_ctx *est, int ref, int vx, int vy,
 
 static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
  int must_update) {
-  int factors[] = { 4, 1 };
+  int factors[] = { 4, 2, 1 };
   int extra_cand[] = { 0, 0 };
   int i;
   int length = sizeof(factors)/sizeof(factors[0]);
