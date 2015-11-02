@@ -2801,28 +2801,31 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     int32_t sad;
     int32_t cost;
     int rate;
-    best_site = 4;
-    b = od_mv_est_get_boundary_case(&limits,
-     best_vec[0], best_vec[1], 1, 2);
-    pattern = OD_SQUARE_SITES[b];
-    nsites = OD_SQUARE_NSITES[b];
-    for (sitei = 0; sitei < nsites; sitei++) {
-      site = pattern[sitei];
-      candx = best_vec[0] + OD_SITE_DX[site];
-      candy = best_vec[1] + OD_SITE_DY[site];
-      sad = od_mv_est_bma_sad(est, ref, bx, by, candx, candy, log_mvb_sz);
-      rate = od_mv_est_cand_bits(est, equal_mvs,
-       candx, candy, pred[0], pred[1], ref, ref_pred);
-      cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
-      if (cost < best_cost) {
-        best_sad = sad;
-        best_rate = rate;
-        best_cost = cost;
-        best_site = site;
+    for (;;) {
+      best_site = 4;
+      b = od_mv_est_get_boundary_case(&limits,
+       best_vec[0], best_vec[1], 1, 2);
+      pattern = OD_SQUARE_SITES[b];
+      nsites = OD_SQUARE_NSITES[b];
+      for (sitei = 0; sitei < nsites; sitei++) {
+        site = pattern[sitei];
+        candx = best_vec[0] + OD_SITE_DX[site];
+        candy = best_vec[1] + OD_SITE_DY[site];
+        sad = od_mv_est_bma_sad(est, ref, bx, by, candx, candy, log_mvb_sz);
+        rate = od_mv_est_cand_bits(est, equal_mvs,
+         candx, candy, pred[0], pred[1], ref, ref_pred);
+        cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;
+        if (cost < best_cost) {
+          best_sad = sad;
+          best_rate = rate;
+          best_cost = cost;
+          best_site = site;
+        }
       }
+      best_vec[0] += OD_SITE_DX[best_site];
+      best_vec[1] += OD_SITE_DY[best_site];
+      if (best_site == 4) break;
     }
-    best_vec[0] += OD_SITE_DX[best_site];
-    best_vec[1] += OD_SITE_DY[best_site];
   }
   OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
    "Finished. Best vector: (%i, %i)  Best cost %i",
