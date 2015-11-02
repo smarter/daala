@@ -6051,6 +6051,7 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int cost_thresh) {
   nhmvbs = state->nhmvbs;
   nvmvbs = state->nvmvbs;
   complexity = est->enc->complexity;
+#if 0
   if (complexity >= OD_MC_SQUARE_SUBPEL_REFINEMENT_COMPLEXITY) {
     pattern_nsites = OD_SQUARE_NSITES;
     pattern = OD_SQUARE_SITES;
@@ -6094,6 +6095,9 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int cost_thresh) {
       best_mv_res = mv_res;
     }
   }
+#else
+  best_mv_res = mv_res = 2;
+#endif
   od_mv_est_update_bma_mvs(est);
   od_state_set_mv_res(state, best_mv_res);
 }
