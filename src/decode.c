@@ -1042,8 +1042,7 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
           left = state->dering_flags[sby*nhsb + (sbx - 1)];
         }
         c = (up << 1) + left;
-        filtered = od_decode_cdf_adapt(&dec->ec, state->adapt.clpf_cdf[c], 2,
-         state->adapt.clpf_increment, "clp");
+        filtered = od_ec_dec_bits(&dec->ec, 1, "clp");
         state->dering_flags[sby*nhsb + sbx] = filtered;
         if (filtered) {
           for (pli = 0; pli < nplanes; pli++) {
