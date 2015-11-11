@@ -99,6 +99,7 @@ void od_adapt_pvq_ctx_reset(od_pvq_adapt_ctx *state, int is_keyframe);
 
 int od_qm_get_index(int bs, int band);
 
+extern const double OD_PVQ_BETA4_LUMA_MASKING_INTER[1];
 extern const double *const OD_PVQ_BETA[2][OD_NPLANES_MAX][OD_NBSIZES + 1];
 
 void od_apply_qm(od_coeff *out, int out_stride, od_coeff *in, int in_stride,

@@ -1101,8 +1101,12 @@ static int od_block_encode(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int bs,
      enc->quantizer[pli], pli);
   }
   else {
+    const double *beta = OD_PVQ_BETA[use_masking][pli][bs];
+    if (use_masking && !ctx->is_keyframe && bs == OD_BLOCK_4X4 && pli == 0) {
+      beta = OD_PVQ_BETA4_LUMA_MASKING_INTER;
+    }
     skip = od_pvq_encode(enc, predt, dblock, scalar_out, quant, pli, bs,
-     OD_PVQ_BETA[use_masking][pli][bs], OD_ROBUST_STREAM, ctx->is_keyframe,
+     beta, OD_ROBUST_STREAM, ctx->is_keyframe,
      ctx->q_scaling, bx, by);
   }
   if (!ctx->is_keyframe) {
