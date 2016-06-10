@@ -684,7 +684,8 @@ int od_pvq_encode(daala_enc_ctx *enc,
                    int bx,
                    int by,
                    const int16_t *qm,
-                   const int16_t *qm_inv){
+                   const int16_t *qm_inv,
+                   PVQ_INFO *pvq_info){
   int theta[PVQ_MAX_PARTITIONS];
   int max_theta[PVQ_MAX_PARTITIONS];
   int qg[PVQ_MAX_PARTITIONS];
@@ -767,6 +768,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   /* Code as if we're not skipping. */
   od_encode_cdf_adapt(&enc->ec, 2 + (out[0] != 0), skip_cdf,
    4, enc->state.adapt.skip_increment);
+  pvq_info->ac_dc_coded = 2 + (out[0] != 0);
 #if OD_SIGNAL_Q_SCALING
   if (bs == OD_NBSIZES - 1 && pli == 0) {
     od_encode_quantizer_scaling(enc, q_scaling, bx >> (OD_NBSIZES - 1),
@@ -792,6 +794,15 @@ int od_pvq_encode(daala_enc_ctx *enc,
     }
   }
   if (theta[0] == skip_theta_value && qg[0] == 0 && skip_rest) nb_bands = 0;
+
+  /* NOTE: There was no other better place to put this function.
+   * TODO: Better if we can call this function only when mode decision
+   *       (i.e. RDO) is over.
+   */
+  store_pvq_enc_info(pvq_info, qg, theta, max_theta, k,
+    y, nb_bands, off, size,
+    skip_rest, skip_dir, bs);
+
   for (i = 0; i < nb_bands; i++) {
     int encode_flip;
     /* Encode CFL flip bit just after the first time it's used. */
@@ -837,6 +848,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     od_encode_rollback(enc, &buf);
     od_encode_cdf_adapt(&enc->ec, out[0] != 0, skip_cdf,
      4, enc->state.adapt.skip_increment);
+    pvq_info->ac_dc_coded = (out[0] != 0);
 #if OD_SIGNAL_Q_SCALING
     if (bs == OD_NBSIZES - 1 && pli == 0) {
       int skip;
