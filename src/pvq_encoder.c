@@ -779,7 +779,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   tell = od_ec_enc_tell_frac(&enc->ec);
   /* Code as if we're not skipping. */
   od_encode_cdf_adapt(&enc->ec, 2 + (out[0] != 0), skip_cdf,
-   4 + (pli == 0 && bs > 0), enc->state.adapt.skip_increment);
+   4, enc->state.adapt.skip_increment);
 #if OD_SIGNAL_Q_SCALING
   if (bs == OD_NBSIZES - 1 && pli == 0) {
     od_encode_quantizer_scaling(enc, q_scaling, bx >> (OD_NBSIZES - 1),
@@ -830,11 +830,11 @@ int od_pvq_encode(daala_enc_ctx *enc,
     double skip_rate;
     if (out[0] != 0) {
       skip_rate = -OD_LOG2((skip_cdf[1] - skip_cdf[0])/
-     (double)skip_cdf[3 + (pli == 0 && bs > 0)]);
+     (double)skip_cdf[3]);
     }
     else {
       skip_rate = -OD_LOG2(skip_cdf[0]/
-     (double)skip_cdf[3 + (pli == 0 && bs > 0)]);
+     (double)skip_cdf[3]);
     }
     tell -= (int)floor(.5+8*skip_rate);
   }
@@ -849,7 +849,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     /* We decide to skip, roll back everything as it was before. */
     od_encode_rollback(enc, &buf);
     od_encode_cdf_adapt(&enc->ec, out[0] != 0, skip_cdf,
-     4 + (pli == 0 && bs > 0), enc->state.adapt.skip_increment);
+     4, enc->state.adapt.skip_increment);
 #if OD_SIGNAL_Q_SCALING
     if (bs == OD_NBSIZES - 1 && pli == 0) {
       int skip;
