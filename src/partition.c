@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # include "config.h"
 #endif
 
-#include "filter.h"
+#include "odintrin.h"
 #include "partition.h"
 #include "zigzag.h"
 

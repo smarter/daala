@@ -25,8 +25,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #if !defined(_generic_code_H)
 # define _generic_code_H
 
-# include "entenc.h"
-# include "entdec.h"
+# include "vpx_dsp/entenc.h"
+# include "vpx_dsp/entdec.h"
 
 # define GENERIC_TABLES 12
 
