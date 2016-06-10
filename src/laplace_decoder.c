@@ -29,10 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include <stdio.h>
 
 #include "pvq_decoder.h"
-#include "entdec.h"
-#include "logging.h"
-#include "odintrin.h"
-#include "pvq.h"
+#include "vpx_dsp/entdec.h"
+#include "vp10/common/pvq.h"
 
 #if OD_ACCOUNTING
 # define od_decode_pvq_split(ec, adapt, sum, ctx, str) od_decode_pvq_split_(ec, adapt, sum, ctx, str)

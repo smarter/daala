@@ -24,8 +24,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 #if !defined(_pvq_H)
 # define _pvq_H (1)
-# include "internal.h"
-# include "filter.h"
+# include "odintrin.h"
 # include "generic_code.h"
 
 extern const double *OD_BASIS_MAG[2][OD_NBSIZES + 1];
