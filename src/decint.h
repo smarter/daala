@@ -35,7 +35,7 @@ typedef struct daala_dec_ctx od_dec_ctx;
 struct daala_dec_ctx {
   od_state state;
   oggbyte_buffer obb;
-  od_ec_dec ec;
+  od_ec_dec *ec;
   int packet_state;
   /*User provided buffer for storing per frame block size information. These
    are set via daala_decode_ctl with OD_DECCTL_SET_BSIZE_BUFFER.*/

@@ -212,7 +212,7 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
      - ref_offset;
     OD_ASSERT(ref_pred >= 0);
     OD_ASSERT(ref_pred < num_refs);
-    mvg->ref = od_decode_cdf_adapt(&dec->ec,
+    mvg->ref = od_decode_cdf_adapt(dec->ec,
      dec->state.adapt.mv_ref_cdf[ref_pred], num_refs, 256,
      "mv:ref") + ref_offset;
   }
@@ -223,20 +223,20 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   equal_mvs = od_state_get_predictor(&dec->state, pred, vx, vy, level,
    mv_res, mvg->ref);
   model = &dec->state.adapt.mv_model;
-  id = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
+  id = od_decode_cdf_adapt(dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
    16, dec->state.adapt.mv_small_increment, "mv:low");
   oy = id >> 2;
   ox = id & 0x3;
   if (ox == 3) {
-    ox += generic_decode(&dec->ec, model, width << (3 - mv_res),
+    ox += generic_decode(dec->ec, model, width << (3 - mv_res),
      &dec->state.adapt.mv_ex[level], 6, "mv:high:x");
   }
   if (oy == 3) {
-    oy += generic_decode(&dec->ec, model, height << (3 - mv_res),
+    oy += generic_decode(dec->ec, model, height << (3 - mv_res),
      &dec->state.adapt.mv_ey[level], 6, "mv:high:y");
   }
-  if (ox && od_ec_dec_bits(&dec->ec, 1, "mv:sign:x")) ox = -ox;
-  if (oy && od_ec_dec_bits(&dec->ec, 1, "mv:sign:y")) oy = -oy;
+  if (ox && od_ec_dec_bits(dec->ec, 1, "mv:sign:x")) ox = -ox;
+  if (oy && od_ec_dec_bits(dec->ec, 1, "mv:sign:y")) oy = -oy;
   if (mvg->ref == OD_FRAME_NEXT) {
     mvg->mv1[0] = (pred[0] + ox)*(1 << mv_res);;
     mvg->mv1[1] = (pred[1] + oy)*(1 << mv_res);;
@@ -332,9 +332,9 @@ static int od_decode_coeff_split_(daala_dec_ctx *dec, int sum, int ctx OD_ACC_ST
   if (sum == 0) return 0;
   shift = OD_MAXI(0, OD_ILOG(sum) - 4);
   if (shift) {
-    a = od_ec_dec_bits(&dec->ec, shift, acc_str);
+    a = od_ec_dec_bits(dec->ec, shift, acc_str);
   }
-  a += od_decode_cdf_adapt(&dec->ec, dec->state.adapt.haar_coeff_cdf[15*ctx
+  a += od_decode_cdf_adapt(dec->ec, dec->state.adapt.haar_coeff_cdf[15*ctx
    + (sum >> shift) - 1], (sum >> shift) + 1,
    dec->state.adapt.haar_coeff_increment, acc_str) << shift;
   if (a > sum) {
@@ -351,9 +351,9 @@ static int od_decode_tree_split_(daala_dec_ctx *dec, int sum, int ctx OD_ACC_STR
   if (sum == 0) return 0;
   shift = OD_MAXI(0, OD_ILOG(sum) - 4);
   if (shift) {
-    a = od_ec_dec_bits(&dec->ec, shift, acc_str);
+    a = od_ec_dec_bits(dec->ec, shift, acc_str);
   }
-  a += od_decode_cdf_adapt(&dec->ec, dec->state.adapt.haar_split_cdf[15*(2*ctx
+  a += od_decode_cdf_adapt(dec->ec, dec->state.adapt.haar_split_cdf[15*(2*ctx
    + OD_MINI(shift, 1)) + (sum >> shift) - 1], (sum >> shift) + 1,
    dec->state.adapt.haar_split_increment, acc_str) << shift;
   if (a > sum) {
@@ -424,9 +424,9 @@ static void od_wavelet_unquantize(daala_dec_ctx *dec, int ln, od_coeff *pred,
   }
   {
     int bits;
-    bits = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.haar_bits_cdf[pli],
+    bits = od_decode_cdf_adapt(dec->ec, dec->state.adapt.haar_bits_cdf[pli],
      16, dec->state.adapt.haar_bits_increment, "haar:top");
-    if (bits == 15) bits += od_ec_dec_unary(&dec->ec, "haar:top");
+    if (bits == 15) bits += od_ec_dec_unary(dec->ec, "haar:top");
     /* Theoretical maximum sum is around 2^7 * 2^OD_COEFF_SHIFT * 32x32,
        so 2^21, but let's play safe. */
     if (bits > 24) {
@@ -435,7 +435,7 @@ static void od_wavelet_unquantize(daala_dec_ctx *dec, int ln, od_coeff *pred,
       return;
     }
     else if (bits > 1) {
-      tree_sum[0][0] = (1 << (bits - 1)) | od_ec_dec_bits(&dec->ec, bits - 1,
+      tree_sum[0][0] = (1 << (bits - 1)) | od_ec_dec_bits(dec->ec, bits - 1,
        "haar:top");
     }
     else tree_sum[0][0] = bits;
@@ -455,7 +455,7 @@ static void od_wavelet_unquantize(daala_dec_ctx *dec, int ln, od_coeff *pred,
       od_coeff in;
       in = pred[i*n + j];
       if (in) {
-        sign = od_ec_dec_bits(&dec->ec, 1, "haar:sign");
+        sign = od_ec_dec_bits(dec->ec, 1, "haar:sign");
         if (sign) in = -in;
       }
       pred[i*n + j] = in;
@@ -560,10 +560,10 @@ static void od_block_decode(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int bs,
     int has_dc_skip;
     has_dc_skip = !ctx->is_keyframe && !ctx->use_haar_wavelet;
     if (!has_dc_skip || pred[0]) {
-      pred[0] = has_dc_skip + generic_decode(&dec->ec,
+      pred[0] = has_dc_skip + generic_decode(dec->ec,
        &dec->state.adapt.model_dc[pli], -1,
        &dec->state.adapt.ex_dc[pli][bs][0], 2, "dc:mag");
-      if (pred[0]) pred[0] *= od_ec_dec_bits(&dec->ec, 1, "dc:sign") ? -1 : 1;
+      if (pred[0]) pred[0] *= od_ec_dec_bits(dec->ec, 1, "dc:sign") ? -1 : 1;
     }
     pred[0] = pred[0]*dc_quant + predt[0];
   }
@@ -634,10 +634,10 @@ static void od_decode_haar_dc_sb(daala_dec_ctx *dec, od_mb_dec_ctx *ctx,
   else if (by > 0) sb_dc_pred = sb_dc_mem[(by - 1)*nhsb + bx];
   else if (bx > 0) sb_dc_pred = sb_dc_mem[by*nhsb + bx - 1];
   else sb_dc_pred = 0;
-  quant = generic_decode(&dec->ec, &dec->state.adapt.model_dc[pli], -1,
+  quant = generic_decode(dec->ec, &dec->state.adapt.model_dc[pli], -1,
    &dec->state.adapt.ex_sb_dc[pli], 2, "haardc:mag:top");
   if (quant) {
-    if (od_ec_dec_bits(&dec->ec, 1, "haardc:sign:top")) quant = -quant;
+    if (od_ec_dec_bits(dec->ec, 1, "haardc:sign:top")) quant = -quant;
   }
   sb_dc_curr = quant*dc_quant + sb_dc_pred;
   d[(by << ln)*w + (bx << ln)] = sb_dc_curr;
@@ -670,10 +670,10 @@ static void od_decode_haar_dc_level(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int 
   x[0] = ctx->d[pli][(by << ln)*w + (bx << ln)];
   for (i = 1; i < 4; i++) {
     int quant;
-    quant = generic_decode(&dec->ec, &dec->state.adapt.model_dc[pli], -1,
+    quant = generic_decode(dec->ec, &dec->state.adapt.model_dc[pli], -1,
      &dec->state.adapt.ex_dc[pli][bsi][i-1], 2, "haardc:mag:level");
     if (quant) {
-      if (od_ec_dec_bits(&dec->ec, 1, "haardc:sign:level")) quant = -quant;
+      if (od_ec_dec_bits(dec->ec, 1, "haardc:sign:level")) quant = -quant;
     }
     x[i] = quant*ac_quant[i == 3];
   }
@@ -706,7 +706,7 @@ static void od_decode_quantizer_scaling(daala_dec_ctx *dec, int bx, int by,
      : 0;
     left = sbx > 0 ? dec->state.sb_q_scaling[sby*dec->state.nhsb + (sbx - 1)]
      : 0;
-    q_scaling = od_decode_cdf_adapt(&dec->ec,
+    q_scaling = od_decode_cdf_adapt(dec->ec,
      dec->state.adapt.q_cdf[above + left*4], 4,
      dec->state.adapt.q_increment, "quant");
   }
@@ -737,7 +737,7 @@ static void od_decode_recursive(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int pli,
      the skip value to the PVQ decoder. */
   if (ctx->use_haar_wavelet) obs = bsi;
   else if (pli == 0) {
-    skip = od_decode_cdf_adapt(&dec->ec,
+    skip = od_decode_cdf_adapt(dec->ec,
      dec->state.adapt.skip_cdf[2*bsi + (pli != 0)], 4 + (bsi > 0),
      dec->state.adapt.skip_increment, "skip");
 #if OD_SIGNAL_Q_SCALING
@@ -774,7 +774,7 @@ static void od_decode_recursive(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int pli,
     }
     if (pli > 0 && !ctx->use_haar_wavelet) {
       /* Decode the skip for chroma. */
-      skip = od_decode_cdf_adapt(&dec->ec,
+      skip = od_decode_cdf_adapt(dec->ec,
        dec->state.adapt.skip_cdf[2*bsi + (pli != 0)], 4,
        dec->state.adapt.skip_increment, "skip");
     }
@@ -842,7 +842,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
   nhmvbs = dec->state.nhmvbs;
   nvmvbs = dec->state.nvmvbs;
   img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
-  mv_res = od_ec_dec_uint(&dec->ec, 3, "mv:res");
+  mv_res = od_ec_dec_uint(dec->ec, 3, "mv:res");
   od_state_set_mv_res(&dec->state, mv_res);
   width = (img->width + 32) << (3 - mv_res);
   height = (img->height + 32) << (3 - mv_res);
@@ -872,7 +872,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
          && grid[vy + mvb_sz][vx - mvb_sz].valid) {
           cdf = od_mv_split_flag_cdf(&dec->state, vx, vy, level);
           mvp = grid[vy] + vx;
-          mvp->valid = od_decode_cdf_adapt(&dec->ec,
+          mvp->valid = od_decode_cdf_adapt(dec->ec,
            cdf, 2, dec->state.adapt.split_flag_increment, "mv:valid");
           if (mvp->valid) {
             od_decode_mv(dec, num_refs, mvp, vx, vy, level, mv_res,
@@ -892,7 +892,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
          && (vx + mvb_sz > nhmvbs || grid[vy][vx + mvb_sz].valid)) {
           cdf = od_mv_split_flag_cdf(&dec->state, vx, vy, level);
           mvp = grid[vy] + vx;
-          mvp->valid = od_decode_cdf_adapt(&dec->ec,
+          mvp->valid = od_decode_cdf_adapt(dec->ec,
            cdf, 2, dec->state.adapt.split_flag_increment, "mv:valid");
           if (mvp->valid) {
             od_decode_mv(dec, num_refs, mvp, vx, vy, level, mv_res,
@@ -940,7 +940,7 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
   /* Map our quantizer; we potentially need it to know what reference
      resolution we're working at. */
   dec->state.coded_quantizer =
-   od_ec_dec_uint(&dec->ec, OD_N_CODED_QUANTIZERS, "quantizer");
+   od_ec_dec_uint(dec->ec, OD_N_CODED_QUANTIZERS, "quantizer");
   dec->state.quantizer =
    od_codedquantizer_to_quantizer(dec->state.coded_quantizer);
   /*Apply the prefilter to the motion-compensated reference.*/
@@ -1042,7 +1042,7 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
           c = up + left;
         }
         else c = 0;
-        level = od_decode_cdf_adapt(&dec->ec, state->adapt.dering_cdf[c],
+        level = od_decode_cdf_adapt(dec->ec, state->adapt.dering_cdf[c],
          OD_DERING_LEVELS, state->adapt.dering_increment, "dering");
         state->dering_level[sby*nhdr + sbx] = level;
         if (level) {
@@ -1115,7 +1115,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, const daala_packet *op) {
   if (op->e_o_s) {
     dec->packet_state = OD_PACKET_DONE;
   }
-  od_ec_dec_init(&dec->ec, op->packet, op->bytes);
+  od_ec_dec_init(dec->ec, op->packet, op->bytes);
 #if OD_ACCOUNTING
   if (dec->acct_enabled) {
     od_accounting_reset(&dec->acct);
@@ -1125,11 +1125,11 @@ int daala_decode_packet_in(daala_dec_ctx *dec, const daala_packet *op) {
 #endif
   OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_FRAME, 0, 0, 0);
   /*Read the packet type bit.*/
-  if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
-  mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+  if (od_ec_decode_bool_q15(dec->ec, 16384, "flags")) return OD_EBADPACKET;
+  mbctx.is_keyframe = od_ec_decode_bool_q15(dec->ec, 16384, "flags");
   if (mbctx.is_keyframe) frame_type = OD_I_FRAME;
   else {
-    if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) {
+    if (od_ec_decode_bool_q15(dec->ec, 16384, "flags")) {
       frame_type = OD_B_FRAME;
     }
     else {
@@ -1138,19 +1138,19 @@ int daala_decode_packet_in(daala_dec_ctx *dec, const daala_packet *op) {
   }
   dec->state.frame_type = frame_type;
   if (frame_type != OD_I_FRAME) {
-    mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
+    mbctx.num_refs = od_ec_dec_uint(dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   }
   else {
     mbctx.num_refs = 0;
   }
-  frame_number = od_ec_dec_uint(&dec->ec, OD_MAX_REORDER, "flags");
-  mbctx.use_activity_masking = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
-  mbctx.qm = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+  frame_number = od_ec_dec_uint(dec->ec, OD_MAX_REORDER, "flags");
+  mbctx.use_activity_masking = od_ec_decode_bool_q15(dec->ec, 16384, "flags");
+  mbctx.qm = od_ec_decode_bool_q15(dec->ec, 16384, "flags");
   /*TODO: Cache the previous qm value to avoid calling this every packet.*/
   od_init_qm(dec->state.qm, dec->state.qm_inv,
    mbctx.qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT);
-  mbctx.use_haar_wavelet = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
-  mbctx.is_golden_frame = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+  mbctx.use_haar_wavelet = od_ec_decode_bool_q15(dec->ec, 16384, "flags");
+  mbctx.is_golden_frame = od_ec_decode_bool_q15(dec->ec, 16384, "flags");
   if (mbctx.is_keyframe) {
     int nplanes;
     int pli;
@@ -1158,7 +1158,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, const daala_packet *op) {
     for (pli = 0; pli < nplanes; pli++) {
       int i;
       for (i = 0; i < OD_QM_SIZE; i++) {
-        dec->state.pvq_qm_q4[pli][i] = od_ec_dec_bits(&dec->ec, 8, "qm");
+        dec->state.pvq_qm_q4[pli][i] = od_ec_dec_bits(dec->ec, 8, "qm");
       }
     }
   }
