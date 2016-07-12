@@ -761,6 +761,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   else {
     dc_rate = -OD_LOG2((double)(skip_cdf[3] - skip_cdf[2])/
      (double)(skip_cdf[2] - skip_cdf[1]));
+    dc_rate += 1;
     out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
      enc->pvq_norm_lambda);
   }
@@ -831,6 +832,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     else {
       dc_rate = -OD_LOG2((double)(skip_cdf[1] - skip_cdf[0])/
        (double)skip_cdf[0]);
+      dc_rate += 1;
       out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
        enc->pvq_norm_lambda);
     }
