@@ -265,8 +265,11 @@ static double od_pvq_rate(daala_enc_ctx *enc,
   od_rollback_buffer buf;
   int tell;
   int skip_rest;
+  int skip_theta_value;
 
-  if (possible_skip_rest && qg == 0 && theta == 0)
+  skip_theta_value = is_keyframe ? -1 : 0;
+
+  if (possible_skip_rest && qg == 0 && theta == skip_theta_value)
     return 0;
 
   skip_rest = 0;
@@ -283,7 +286,7 @@ static double od_pvq_rate(daala_enc_ctx *enc,
 
   od_encode_rollback(enc, &buf);
 
-  if (possible_skip_rest && (qg != 0 || theta != 0)) {
+  if (possible_skip_rest && (qg != 0 || theta != skip_theta_value)) {
     double rate2;
     skip_rest = 1;
 
