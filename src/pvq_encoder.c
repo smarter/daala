@@ -856,7 +856,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
      robust || is_keyframe, (pli != 0)*OD_NBSIZES*PVQ_MAX_PARTITIONS
      + bs*PVQ_MAX_PARTITIONS + i, i == 0 && (i < nb_bands - 1),
                       possible_skip_rest, encode_flip, flip);
-    if (theta[i] != skip_theta_value || qg[i]) possible_skip_rest = 0;
+    if (i > 0 && (theta[i] != skip_theta_value || qg[i])) possible_skip_rest = 0;
     if (encode_flip) cfl_encoded = 1;
   }
   od_encode_checkpoint(enc, &buf);
