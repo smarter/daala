@@ -715,16 +715,11 @@ static void pvq_encode_partition(od_ec_enc *ec,
  * @retval quantized value
  */
 int od_rdo_quant(od_coeff x, int q, double delta0, double pvq_norm_lambda) {
-  int n, threshold;
+  int threshold;
   /* Optimal quantization threshold is 1/2 + lambda*delta_rate/2. See
      Jmspeex' Journal of Dubious Theoretical Results for details. */
-  n = OD_DIV_R0(abs(x), q);
-#if 0
-  threshold = n*128 + OD_CLAMPI(0, (int)(256*pvq_norm_lambda*delta0/(2*n)), 128*n);
+  threshold = 128 + OD_CLAMPI(0, (int)(256*pvq_norm_lambda*delta0/2), 128);
   if (abs(x) < q*threshold/256) {
-#else
-  if ((double)abs(x)/q < (double)n/2 + pvq_norm_lambda*delta0/(2*n)) {
-#endif
     return 0;
   }
   else {
@@ -899,21 +894,8 @@ int od_pvq_encode(daala_enc_ctx *enc,
     if (n == 0) {
       out[0] = 0;
     } else {
-      int tell2;
-      od_rollback_buffer dc_buf;
-
       dc_rate = -OD_LOG2((double)(skip_cdf[3] - skip_cdf[2])/
        (double)(skip_cdf[2] - skip_cdf[1]));
-      dc_rate += 1;
-
-      tell2 = od_ec_enc_tell_frac(&enc->ec);
-      od_encode_checkpoint(enc, &dc_buf);
-      generic_encode(&enc->ec, &enc->state.adapt.model_dc[pli],
-       n - 1, -1, &enc->state.adapt.ex_dc[pli][bs][0], 2);
-      tell2 = od_ec_enc_tell_frac(&enc->ec) - tell2;
-      dc_rate += tell2/8.0;
-      od_encode_rollback(enc, &dc_buf);
-
       out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
        enc->pvq_norm_lambda);
     }
@@ -971,21 +953,8 @@ int od_pvq_encode(daala_enc_ctx *enc,
       if (n == 0) {
         out[0] = 0;
       } else {
-        int tell2;
-        od_rollback_buffer dc_buf;
-
         dc_rate = -OD_LOG2((double)(skip_cdf[1] - skip_cdf[0])/
          (double)skip_cdf[0]);
-        dc_rate += 1;
-
-        tell2 = od_ec_enc_tell_frac(&enc->ec);
-        od_encode_checkpoint(enc, &dc_buf);
-        generic_encode(&enc->ec, &enc->state.adapt.model_dc[pli],
-         n - 1, -1, &enc->state.adapt.ex_dc[pli][bs][0], 2);
-        tell2 = od_ec_enc_tell_frac(&enc->ec) - tell2;
-        dc_rate += tell2/8.0;
-        od_encode_rollback(enc, &dc_buf);
-
         out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
          enc->pvq_norm_lambda);
       }
