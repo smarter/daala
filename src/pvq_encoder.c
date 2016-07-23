@@ -835,7 +835,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     }
   }
   skip_theta_value = is_keyframe ? -1 : 0;
-  possible_skip_rest = 1;
+  possible_skip_rest = 0;
   cfl_encoded = 0;
   od_encode_checkpoint(enc, &buf);
   for (i = 0; i < nb_bands; i++) {
