@@ -837,6 +837,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   skip_theta_value = is_keyframe ? -1 : 0;
   possible_skip_rest = 1;
   cfl_encoded = 0;
+  od_encode_checkpoint(enc, &buf);
   for (i = 0; i < nb_bands; i++) {
     int encode_flip;
     int q;
@@ -851,10 +852,20 @@ int od_pvq_encode(daala_enc_ctx *enc,
      robust || is_keyframe, (pli != 0)*OD_NBSIZES*PVQ_MAX_PARTITIONS
      + bs*PVQ_MAX_PARTITIONS + i, i == 0 && (i < nb_bands - 1),
                       possible_skip_rest, encode_flip, flip);
-    if (i > 0 && (theta[i] != skip_theta_value || qg[i])) possible_skip_rest = 0;
+    if (theta[i] != skip_theta_value || qg[i]) {
+      if (i != 0)
+        possible_skip_rest = 0;
+
+      /* just for updating probabilities */
+      pvq_encode_partition(&enc->ec, qg[i], theta[i], max_theta[i], y + off[i],
+       size[i], k[i], model, &enc->state.adapt, exg + i, ext + i,
+       robust || is_keyframe, (pli != 0)*OD_NBSIZES*PVQ_MAX_PARTITIONS
+       + bs*PVQ_MAX_PARTITIONS + i, is_keyframe, i == 0 && (i < nb_bands - 1),
+       possible_skip_rest, encode_flip, flip);
+    }
     if (encode_flip) cfl_encoded = 1;
   }
-  od_encode_checkpoint(enc, &buf);
+  od_encode_rollback(enc, &buf);
   if (is_keyframe) out[0] = 0;
   else {
     int n;
