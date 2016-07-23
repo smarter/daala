@@ -308,6 +308,11 @@ static double od_pvq_rate(daala_enc_ctx *enc,
   return rate;
 }
 
+static int make_coded_qg(int qg, int icgr, int noref, int is_keyframe) {
+  if (is_keyframe) return noref ? qg : neg_interleave(qg, icgr);
+  else return noref ? qg - 1 : neg_interleave(qg + 1, icgr + 1);
+}
+
 /** Perform PVQ quantization with prediction, trying several
  * possible gains and angles. See draft-valin-videocodec-pvq and
  * http://jmvalin.ca/slides/pvq.pdf for more details.
@@ -387,6 +392,7 @@ static int pvq_theta(daala_enc_ctx *enc,
   int xshift;
   int rshift;
   double rate, best_rate;
+  int coded_qg, best_coded_qg;
   /* Give more weight to gain error when calculating the total distortion. */
   gain_weight = 1.4;
   OD_ASSERT(n > 1);
@@ -433,14 +439,15 @@ static int pvq_theta(daala_enc_ctx *enc,
   qg = 0;
   dist = gain_weight*cg*cg*OD_CGAIN_SCALE_2;
   best_dist = dist;
-  best_rate = od_pvq_rate(enc, 0, -1, 0, y_tmp, n, 0,
-   model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
-   code_skip, possible_skip_rest, encode_flip, flip);
-  best_cost = dist + pvq_norm_lambda*best_rate;
   noref = 1;
   best_k = 0;
   *itheta = -1;
   *max_theta = 0;
+  best_coded_qg = make_coded_qg(0, icgr, noref, is_keyframe);
+  best_rate = od_pvq_rate(enc, best_coded_qg, -1, 0, y_tmp, n, 0,
+   model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
+   code_skip, possible_skip_rest, encode_flip, flip);
+  best_cost = dist + pvq_norm_lambda*best_rate;
   OD_CLEAR(y, n);
   best_qtheta = 0;
   m = 0;
@@ -462,17 +469,17 @@ static int pvq_theta(daala_enc_ctx *enc,
        + scgr*(double)cg*(2 - 2*corr);
       best_dist *= OD_CGAIN_SCALE_2;
     }
-    {
-      int coded_qg = neg_interleave(0 + 1, icgr + 1);
-      best_rate = od_pvq_rate(enc, coded_qg, 0, 0, y_tmp, n, 0,
-       model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
-       code_skip, possible_skip_rest, encode_flip, flip);
-      best_cost = best_dist + pvq_norm_lambda*best_rate;
-    }
     best_qtheta = 0;
     *itheta = 0;
     *max_theta = 0;
     noref = 0;
+    {
+      best_coded_qg = make_coded_qg(0, icgr, noref, is_keyframe);
+      best_rate = od_pvq_rate(enc, best_coded_qg, 0, 0, y_tmp, n, 0,
+       model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
+       code_skip, possible_skip_rest, encode_flip, flip);
+      best_cost = best_dist + pvq_norm_lambda*best_rate;
+    }
   }
   if (n <= OD_MAX_PVQ_SIZE && !od_vector_is_null(r0, n) && corr > 0) {
     od_val16 xr[MAXN];
@@ -517,13 +524,14 @@ static int pvq_theta(daala_enc_ctx *enc,
         dist *= OD_CGAIN_SCALE_2;
         /* Do approximate RDO. */
         {
-          int coded_qg = neg_interleave(i + 1, icgr + 1); /* noref = 0 */
+          coded_qg = make_coded_qg(i, icgr, /*noref=*/0, is_keyframe);
           rate = od_pvq_rate(enc, coded_qg, j, ts, y_tmp, n, k,
            model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
            code_skip, possible_skip_rest, encode_flip, flip);
           cost = dist + pvq_norm_lambda*rate;
         }
         if (cost < best_cost) {
+          best_coded_qg = coded_qg;
           best_rate = rate;
           best_cost = cost;
           best_dist = dist;
@@ -561,13 +569,14 @@ static int pvq_theta(daala_enc_ctx *enc,
       dist *= OD_CGAIN_SCALE_2;
       /* Do approximate RDO. */
       {
-        int coded_qg = i - 1; /* noref = 1 */
+        coded_qg = make_coded_qg(i, icgr, /*noref=*/1, is_keyframe);
         rate = od_pvq_rate(enc, coded_qg, -1, 0, y_tmp, n, k,
          model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
          code_skip, possible_skip_rest, encode_flip, flip);
         cost = dist + pvq_norm_lambda*rate;
       }
       if (cost <= best_cost) {
+        best_coded_qg = coded_qg;
         best_rate = rate;
         best_cost = cost;
         best_dist = dist;
@@ -609,8 +618,13 @@ static int pvq_theta(daala_enc_ctx *enc,
   /* Encode gain differently depending on whether we use prediction or not.
      Special encoding on inter frames where qg=0 is allowed for noref=0
      but not noref=1.*/
-  if (is_keyframe) return noref ? qg : neg_interleave(qg, icgr);
-  else return noref ? qg - 1 : neg_interleave(qg + 1, icgr + 1);
+  {
+    int ret;
+     if (is_keyframe) ret = noref ? qg : neg_interleave(qg, icgr);
+     else ret = noref ? qg - 1 : neg_interleave(qg + 1, icgr + 1);
+    OD_ASSERT(ret == best_coded_qg);
+    return ret;
+  }
 }
 
 /** Encodes a single vector of integers (eg, a partition within a
