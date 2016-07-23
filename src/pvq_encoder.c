@@ -349,7 +349,8 @@ static int pvq_theta(daala_enc_ctx *enc,
                      int code_skip,
                      int possible_skip_rest,
                      int encode_flip,
-                     int flip
+                     int flip,
+ double *saved_rate
                      ) {
   od_val32 g;
   od_val32 gr;
@@ -385,6 +386,7 @@ static int pvq_theta(daala_enc_ctx *enc,
   od_val16 r16[MAXN];
   int xshift;
   int rshift;
+  double rate, best_rate;
   /* Give more weight to gain error when calculating the total distortion. */
   gain_weight = 1.4;
   OD_ASSERT(n > 1);
@@ -431,10 +433,10 @@ static int pvq_theta(daala_enc_ctx *enc,
   qg = 0;
   dist = gain_weight*cg*cg*OD_CGAIN_SCALE_2;
   best_dist = dist;
-  best_cost = dist + pvq_norm_lambda*
-      od_pvq_rate(enc, 0, -1, 0, y_tmp, n, 0,
-                  model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
-                  code_skip, possible_skip_rest, encode_flip, flip);
+  best_rate = od_pvq_rate(enc, 0, -1, 0, y_tmp, n, 0,
+   model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
+   code_skip, possible_skip_rest, encode_flip, flip);
+  best_cost = dist + pvq_norm_lambda*best_rate;
   noref = 1;
   best_k = 0;
   *itheta = -1;
@@ -462,10 +464,10 @@ static int pvq_theta(daala_enc_ctx *enc,
     }
     {
       int coded_qg = neg_interleave(0 + 1, icgr + 1);
-      best_cost = best_dist + pvq_norm_lambda*
-          od_pvq_rate(enc, coded_qg, 0, 0, y_tmp, n, 0,
-                      model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
-                      code_skip, possible_skip_rest, encode_flip, flip);
+      best_rate = od_pvq_rate(enc, coded_qg, 0, 0, y_tmp, n, 0,
+       model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
+       code_skip, possible_skip_rest, encode_flip, flip);
+      best_cost = best_dist + pvq_norm_lambda*best_rate;
     }
     best_qtheta = 0;
     *itheta = 0;
@@ -516,12 +518,13 @@ static int pvq_theta(daala_enc_ctx *enc,
         /* Do approximate RDO. */
         {
           int coded_qg = neg_interleave(i + 1, icgr + 1); /* noref = 0 */
-          cost = dist + pvq_norm_lambda*
-              od_pvq_rate(enc, coded_qg, j, ts, y_tmp, n, k,
-                          model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
-                          code_skip, possible_skip_rest, encode_flip, flip);
+          rate = od_pvq_rate(enc, coded_qg, j, ts, y_tmp, n, k,
+           model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
+           code_skip, possible_skip_rest, encode_flip, flip);
+          cost = dist + pvq_norm_lambda*rate;
         }
         if (cost < best_cost) {
+          best_rate = rate;
           best_cost = cost;
           best_dist = dist;
           qg = i;
@@ -559,12 +562,13 @@ static int pvq_theta(daala_enc_ctx *enc,
       /* Do approximate RDO. */
       {
         int coded_qg = i - 1; /* noref = 1 */
-        cost = dist + pvq_norm_lambda*
-            od_pvq_rate(enc, coded_qg, -1, 0, y_tmp, n, k,
-                        model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
-                        code_skip, possible_skip_rest, encode_flip, flip);
+        rate = od_pvq_rate(enc, coded_qg, -1, 0, y_tmp, n, k,
+         model, adapt, exg, ext, nodesync, cdf_ctx, is_keyframe,
+         code_skip, possible_skip_rest, encode_flip, flip);
+        cost = dist + pvq_norm_lambda*rate;
       }
       if (cost <= best_cost) {
+        best_rate = rate;
         best_cost = cost;
         best_dist = dist;
         qg = i;
@@ -601,6 +605,7 @@ static int pvq_theta(daala_enc_ctx *enc,
   }
   *vk = k;
   *skip_diff += skip_dist - best_dist;
+  *saved_rate += best_rate;
   /* Encode gain differently depending on whether we use prediction or not.
      Special encoding on inter frames where qg=0 is allowed for noref=0
      but not noref=1.*/
@@ -798,6 +803,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   const unsigned char *pvq_qm;
   double dc_rate;
   int possible_skip_rest;
+  double computed_rate, actual_rate, skip_cdf_rate;
 #if !OD_SIGNAL_Q_SCALING
   OD_UNUSED(q_scaling);
   OD_UNUSED(bx);
@@ -843,6 +849,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   possible_skip_rest = 0;
   cfl_encoded = 0;
   od_encode_checkpoint(enc, &buf);
+  computed_rate = 0;
   for (i = 0; i < nb_bands; i++) {
     int encode_flip;
     int q;
@@ -856,7 +863,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
      model, &enc->state.adapt, exg + i, ext + i,
      robust || is_keyframe, (pli != 0)*OD_NBSIZES*PVQ_MAX_PARTITIONS
      + bs*PVQ_MAX_PARTITIONS + i, 0,
-     possible_skip_rest, encode_flip, flip);
+     possible_skip_rest, encode_flip, flip, &computed_rate);
     if (1 || (theta[i] != skip_theta_value || qg[i])) {
       if (i != 0)
         possible_skip_rest = 0;
@@ -897,10 +904,12 @@ int od_pvq_encode(daala_enc_ctx *enc,
        enc->pvq_norm_lambda);
     }
   }
+  actual_rate = 0;
   tell = od_ec_enc_tell_frac(&enc->ec);
   /* Code as if we're not skipping. */
   od_encode_cdf_adapt(&enc->ec, 2 + (out[0] != 0), skip_cdf,
    4 + (pli == 0 && bs > 0), enc->state.adapt.skip_increment);
+  skip_cdf_rate = (od_ec_enc_tell_frac(&enc->ec) - tell)/8.0;
 #if OD_SIGNAL_Q_SCALING
   if (bs == OD_NBSIZES - 1 && pli == 0) {
     od_encode_quantizer_scaling(enc, q_scaling, bx >> (OD_NBSIZES - 1),
@@ -925,6 +934,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     if (encode_flip) cfl_encoded = 1;
   }
   tell = od_ec_enc_tell_frac(&enc->ec) - tell;
+  actual_rate = tell/8.0;
   /* Account for the rate of skipping the AC, based on the same DC decision
      we made when trying to not skip AC. */
   {
@@ -985,5 +995,6 @@ int od_pvq_encode(daala_enc_ctx *enc,
     else for (i = 1; i < 1 << (2*bs + 4); i++) out[i] = ref[i];
     if (out[0] == 0) return 1;
   }
+  /* printf("c[%f] a[%f] s[%f]\n", computed_rate, actual_rate, skip_cdf_rate); */
   return 0;
 }
