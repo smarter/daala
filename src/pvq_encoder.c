@@ -146,7 +146,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
       tmp_xy = xy + x[j];
       tmp_yy = yy + 2*ypulse[j] + 1;
       tmp_xy *= tmp_xy;
-      if (j == 0 || tmp_xy*best_yy > best_xy*tmp_yy) {
+      if (j == 0 || tmp_xy*sqrt(best_yy) > best_xy*sqrt(tmp_yy)) {
         best_xy = tmp_xy;
         best_yy = tmp_yy;
         pos = j;
