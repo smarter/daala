@@ -206,7 +206,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
       /*Calculate rsqrt(yy + 2*ypulse[j] + 1) using an optimized method.*/
       tmp_yy = od_custom_rsqrt_dynamic_table(rsqrt_table, rsqrt_table_size,
        yy, ypulse[j]);
-      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*j*7./n;
+      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*j*5./n;
       if (j == 0 || tmp_xy > best_cost) {
         best_cost = tmp_xy;
         pos = j;
