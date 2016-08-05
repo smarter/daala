@@ -131,7 +131,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
   rdo_pulses = 1 + k/4;
   /* Rough assumption for now, the last position costs about 3 bits more than
      the first. */
-  delta_rate = 7./n;
+  delta_rate = 3./n;
   /* Search one pulse at a time */
   for (; i < k - rdo_pulses; i++) {
     int pos;
@@ -160,7 +160,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
      and since x^2 and y^2 are constant, we just maximize x*y, plus a
      lambda*rate term. Note that since x and y aren't normalized here,
      we need to divide by sqrt(x^2)*sqrt(y^2). */
-  for (; i < k; i++) {
+  for (; i < k - 1; i++) {
     double rsqrt_table[4];
     int rsqrt_table_size = 4;
     int pos;
@@ -179,6 +179,34 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
       tmp_yy = od_custom_rsqrt_dynamic_table(rsqrt_table, rsqrt_table_size,
        yy, ypulse[j]);
       tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*j*delta_rate;
+      if (j == 0 || tmp_xy > best_cost) {
+        best_cost = tmp_xy;
+        pos = j;
+      }
+    }
+    xy = xy + x[pos];
+    yy = yy + 2*ypulse[pos] + 1;
+    ypulse[pos]++;
+  }
+  for (; i < k; i++) {
+    double rsqrt_table[4];
+    int rsqrt_table_size = 4;
+    int pos;
+    double best_cost;
+    pos = 0;
+    best_cost = -1e5;
+    /*Fill the small rsqrt lookup table with inputs relative to yy.
+      Specifically, the table of n values is filled with
+       rsqrt(yy + 1), rsqrt(yy + 2 + 1) .. rsqrt(yy + 2*(n-1) + 1).*/
+    od_fill_dynamic_rqrt_table(rsqrt_table, rsqrt_table_size, yy);
+    for (j = 0; j < n; j++) {
+      double tmp_xy;
+      double tmp_yy;
+      tmp_xy = xy + x[j];
+      /*Calculate rsqrt(yy + 2*ypulse[j] + 1) using an optimized method.*/
+      tmp_yy = od_custom_rsqrt_dynamic_table(rsqrt_table, rsqrt_table_size,
+       yy, ypulse[j]);
+      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*j*7./n;
       if (j == 0 || tmp_xy > best_cost) {
         best_cost = tmp_xy;
         pos = j;
