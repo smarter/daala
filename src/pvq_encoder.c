@@ -192,31 +192,27 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
   {
     od_rollback_buffer buf;
     int tell;
-    double r0, rn;
-    od_coeff y0[MAXN];
-    od_coeff yn[MAXN];
+    od_coeff y_tmp[MAXN];
+    int r8[MAXN];
 
+    printf("%d:", n);
     for (j = 0; j < n; j++) {
-      y0[j] = yn[j] = ypulse[j];
+      int l;
+      for (l = 0; l < n; l++) {
+        y_tmp[l] = ypulse[l];
+      }
+      y_tmp[j]++;
+
+      tell = od_ec_enc_tell_frac(&enc->ec);
+
+      od_encode_checkpoint(enc, &buf);
+      od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, y_tmp, n, k);
+      r8[j] = od_ec_enc_tell_frac(&enc->ec)-tell;
+
+      od_encode_rollback(enc, &buf);
+      printf("%c%d", j ? ',' : ' ', r8[j]);
     }
-    y0[0]++;
-    yn[n-1]++;
-
-    tell = od_ec_enc_tell_frac(&enc->ec);
-
-    od_encode_checkpoint(enc, &buf);
-    od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, y0, n, k);
-    r0 = (od_ec_enc_tell_frac(&enc->ec)-tell)/8.;
-
-    od_encode_rollback(enc, &buf);
-    od_encode_checkpoint(enc, &buf);
-
-    od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, yn, n, k);
-    rn = (od_ec_enc_tell_frac(&enc->ec)-tell)/8.;
-
-    od_encode_rollback(enc, &buf);
-
-    printf("%f\n", rn-r0);
+    printf("\n");
   }
   {
     double rsqrt_table[4];
