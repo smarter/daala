@@ -88,7 +88,7 @@ static void od_fill_dynamic_rqrt_table(double *table, const int table_size,
  * @param [in] pvq_norm_lambda enc->pvq_norm_lambda for quantized RDO
  * @return                  cosine distance between x and y (between 0 and 1)
  */
-static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
+static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, int n, int k,
  od_coeff *ypulse, double g2, double pvq_norm_lambda) {
   int i, j;
   double xy;
@@ -160,7 +160,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
      and since x^2 and y^2 are constant, we just maximize x*y, plus a
      lambda*rate term. Note that since x and y aren't normalized here,
      we need to divide by sqrt(x^2)*sqrt(y^2). */
-  for (; i < k; i++) {
+  for (; i < k - 1; i++) {
     double rsqrt_table[4];
     int rsqrt_table_size = 4;
     int pos;
@@ -187,6 +187,65 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
     xy = xy + x[pos];
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
+  }
+  if (i < k) {
+  {
+    od_rollback_buffer buf;
+    int tell;
+    double r0, rn;
+    od_coeff y0[MAXN];
+    od_coeff yn[MAXN];
+
+    for (j = 0; j < n; j++) {
+      y0[j] = yn[j] = ypulse[j];
+    }
+    y0[0]++;
+    yn[n-1]++;
+
+    tell = od_ec_enc_tell_frac(&enc->ec);
+
+    od_encode_checkpoint(enc, &buf);
+    od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, y0, n, k);
+    r0 = (od_ec_enc_tell_frac(&enc->ec)-tell)/8.;
+
+    od_encode_rollback(enc, &buf);
+    od_encode_checkpoint(enc, &buf);
+
+    od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, yn, n, k);
+    rn = (od_ec_enc_tell_frac(&enc->ec)-tell)/8.;
+
+    od_encode_rollback(enc, &buf);
+
+    printf("%f\n", rn-r0);
+  }
+  {
+    double rsqrt_table[4];
+    int rsqrt_table_size = 4;
+    int pos;
+    double best_cost;
+    pos = 0;
+    best_cost = -1e5;
+    /*Fill the small rsqrt lookup table with inputs relative to yy.
+       Specifically, the table of n values is filled with
+       rsqrt(yy + 1), rsqrt(yy + 2 + 1) .. rsqrt(yy + 2*(n-1) + 1).*/
+    od_fill_dynamic_rqrt_table(rsqrt_table, rsqrt_table_size, yy);
+    for (j = 0; j < n; j++) {
+      double tmp_xy;
+      double tmp_yy;
+      tmp_xy = xy + x[j];
+      /*Calculate rsqrt(yy + 2*ypulse[j] + 1) using an optimized method.*/
+      tmp_yy = od_custom_rsqrt_dynamic_table(rsqrt_table, rsqrt_table_size,
+       yy, ypulse[j]);
+      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*j*delta_rate;
+      if (j == 0 || tmp_xy > best_cost) {
+        best_cost = tmp_xy;
+        pos = j;
+      }
+    }
+    xy = xy + x[pos];
+    yy = yy + 2*ypulse[pos] + 1;
+    ypulse[pos]++;
+  }
   }
   for (i = 0; i < n; i++) {
     if (xcoeff[i] < 0) ypulse[i] = -ypulse[i];
@@ -278,7 +337,7 @@ static double od_pvq_rate(int qg, int icgr, int theta, int ts,
  * @param [in] pvq_norm_lambda enc->pvq_norm_lambda for quantized RDO
  * @return         gain      index of the quatized gain
 */
-static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
+static int pvq_theta(daala_enc_ctx *enc, od_coeff *out, const od_coeff *x0, const od_coeff *r0,
  int n, int q0, od_coeff *y, int *itheta, int *max_theta, int *vk,
  double beta, double *skip_diff, int robust, int is_keyframe, int pli,
  const od_adapt_ctx *adapt, const int16_t *qm,
@@ -431,7 +490,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
         /* PVQ search, using a gain of qcg*cg*sin(theta)*sin(qtheta) since
            that's the factor by which cos_dist is multiplied to get the
            distortion metric. */
-        cos_dist = pvq_search_rdo_double(xr, n - 1, k, y_tmp,
+        cos_dist = pvq_search_rdo_double(enc, xr, n - 1, k, y_tmp,
          qcg*(double)cg*sin_prod*OD_CGAIN_SCALE_2, pvq_norm_lambda);
         /* See Jmspeex' Journal of Dubious Theoretical Results. */
         dist_theta = 2 - 2.*od_pvq_cos(theta - qtheta)*OD_TRIG_SCALE_1
@@ -470,7 +529,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
       od_val32 qcg;
       qcg = OD_SHL(i, OD_CGAIN_SHIFT);
       k = od_pvq_compute_k(qcg, -1, -1, 1, n, beta, robust || is_keyframe);
-      cos_dist = pvq_search_rdo_double(x16, n, k, y_tmp,
+      cos_dist = pvq_search_rdo_double(enc, x16, n, k, y_tmp,
        qcg*(double)cg*OD_CGAIN_SCALE_2, pvq_norm_lambda);
       /* See Jmspeex' Journal of Dubious Theoretical Results. */
       dist = gain_weight*(qcg - cg)*(qcg - cg)
@@ -751,7 +810,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   for (i = 0; i < nb_bands; i++) {
     int q;
     q = OD_MAXI(1, q0*pvq_qm[od_qm_get_index(bs, i + 1)] >> 4);
-    qg[i] = pvq_theta(out + off[i], in + off[i], ref + off[i], size[i],
+    qg[i] = pvq_theta(enc, out + off[i], in + off[i], ref + off[i], size[i],
      q, y + off[i], &theta[i], &max_theta[i],
      &k[i], beta[i], &skip_diff, robust, is_keyframe, pli, &enc->state.adapt,
      qm + off[i], qm_inv + off[i], enc->pvq_norm_lambda);
