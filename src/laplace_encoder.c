@@ -62,7 +62,7 @@ void od_encode_band_pvq_splits(od_ec_enc *ec, od_pvq_codeword_ctx *adapt,
   if (k == 1 && n <= 16) {
     int cdf_id;
     int pos;
-    cdf_id = od_pvq_k1_ctx(n, level == 0);
+    cdf_id = od_pvq_k1_ctx(n, level == 0 && n >= 15);
     for (pos = 0; !y[pos]; pos++);
     OD_ASSERT(pos < n);
     od_encode_cdf_adapt(ec, pos, adapt->pvq_k1_cdf[cdf_id], n,
@@ -73,7 +73,7 @@ void od_encode_band_pvq_splits(od_ec_enc *ec, od_pvq_codeword_ctx *adapt,
     count_right = k;
     for (i = 0; i < mid; i++) count_right -= abs(y[i]);
     od_encode_pvq_split(ec, adapt, count_right, k, od_pvq_size_ctx(n));
-    od_encode_band_pvq_splits(ec, adapt, y, mid, k - count_right, level + 1);
+    od_encode_band_pvq_splits(ec, adapt, y, mid, k - count_right, level);
     od_encode_band_pvq_splits(ec, adapt, y + mid, n - mid, count_right,
      level + 1);
   }
