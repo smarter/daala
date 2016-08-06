@@ -188,14 +188,13 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
   }
-  if (i < k) {
+  for (; i < k; i++) {
+  int r8[MAXN];
   {
     od_rollback_buffer buf;
     int tell;
     od_coeff y_tmp[MAXN];
-    int r8[MAXN];
-
-    printf("%d:", n);
+    /* printf("%d:", n); */
     for (j = 0; j < n; j++) {
       int l;
       for (l = 0; l < n; l++) {
@@ -206,13 +205,13 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
       tell = od_ec_enc_tell_frac(&enc->ec);
 
       od_encode_checkpoint(enc, &buf);
-      od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, y_tmp, n, k);
+      od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, y_tmp, n, i + 1);
       r8[j] = od_ec_enc_tell_frac(&enc->ec)-tell;
 
       od_encode_rollback(enc, &buf);
-      printf("%c%d", j ? ',' : ' ', r8[j]);
+      /* printf("%c%d", j ? ',' : ' ', r8[j]); */
     }
-    printf("\n");
+    /* printf("\n"); */
   }
   {
     double rsqrt_table[4];
@@ -232,7 +231,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
       /*Calculate rsqrt(yy + 2*ypulse[j] + 1) using an optimized method.*/
       tmp_yy = od_custom_rsqrt_dynamic_table(rsqrt_table, rsqrt_table_size,
        yy, ypulse[j]);
-      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*j*delta_rate;
+      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*r8[j]/8.0;
       if (j == 0 || tmp_xy > best_cost) {
         best_cost = tmp_xy;
         pos = j;
