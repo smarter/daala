@@ -160,7 +160,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
      and since x^2 and y^2 are constant, we just maximize x*y, plus a
      lambda*rate term. Note that since x and y aren't normalized here,
      we need to divide by sqrt(x^2)*sqrt(y^2). */
-  for (; i < k - 1; i++) {
+  for (; i < k - 2; i++) {
     double rsqrt_table[4];
     int rsqrt_table_size = 4;
     int pos;
