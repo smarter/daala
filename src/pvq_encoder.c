@@ -111,7 +111,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
     xx += x[j]*x[j];
   }
   norm_1 = 1./sqrt(1e-30 + xx);
-  lambda = pvq_norm_lambda/(1e-30 + g2);
+  lambda = pvq_norm_lambda/(1e-30 + g2*2);
   i = 0;
   if (k > 2) {
     double l1_norm;
@@ -135,7 +135,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
   rdo_pulses = 1 + k/4;
   /* Rough assumption for now, the last position costs about 3 bits more than
      the first. */
-  delta_rate = 3./n;
+  delta_rate = 6./n;
   /* Search one pulse at a time */
   for (; i < k - rdo_pulses; i++) {
     int pos;
@@ -192,7 +192,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
   }
-  for (pulse = k; pulse > OD_MAXI(k-2, 0); pulse--) {
+  for (pulse = k; pulse > OD_MAXI(k-1, 0); pulse--) {
     double best_cost = -1e5;
     int old_pos; /* position of pulse in y_pulse */
     int new_pos; /* position after RDO */
