@@ -88,7 +88,7 @@ static void od_fill_dynamic_rqrt_table(double *table, const int table_size,
  * @param [in] pvq_norm_lambda enc->pvq_norm_lambda for quantized RDO
  * @return                  cosine distance between x and y (between 0 and 1)
  */
-static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
+static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, int n, int k,
  od_coeff *ypulse, double g2, double pvq_norm_lambda) {
   int i, j;
   double xy;
@@ -101,6 +101,10 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
   double norm_1;
   int rdo_pulses;
   double delta_rate;
+  int pulse;
+  od_rollback_buffer buf;
+  od_encode_checkpoint(enc, &buf);
+
   xx = xy = yy = 0;
   for (j = 0; j < n; j++) {
     x[j] = fabs((float)xcoeff[j]);
@@ -187,6 +191,60 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
     xy = xy + x[pos];
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
+  }
+  for (pulse = k; pulse > OD_MAXI(k-1, 0); pulse--) {
+    double best_cost = -1e5;
+    int old_pos; /* position of pulse in y_pulse */
+    int new_pos; /* position after RDO */
+
+    int tmp_pulse = 0;
+    for (old_pos = 0; ; old_pos++) {
+      tmp_pulse += ypulse[old_pos];
+      if (tmp_pulse >= pulse) break;
+    }
+    if (old_pos == 0) break;
+
+    /* for (j = 0; j < n; j++) { */
+    for (j = 0; j <= old_pos; j++) {
+      od_coeff tmp_y[MAXN];
+      double tmp_xy = xy;
+      double tmp_yy = yy;
+      double tmp_cost;
+      int tell, r8;
+      int l;
+
+      for (l = 0; l < n; l++) {
+        tmp_y[l] = ypulse[l];
+      }
+      if (j != old_pos) {
+        /* Move pulse from old_pos to j */
+        tmp_xy = xy + x[j] - x[old_pos];
+        tmp_yy = yy + 2*((ypulse[j] + 1) - ypulse[old_pos]);
+
+        tmp_y[old_pos]--;
+        tmp_y[j]++;
+      }
+
+      tell = od_ec_enc_tell_frac(&enc->ec);
+
+      od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, tmp_y, n, k);
+      r8 = od_ec_enc_tell_frac(&enc->ec)-tell;
+      od_encode_rollback(enc, &buf);
+
+      tmp_cost = 2*tmp_xy*norm_1/sqrt(tmp_yy) - lambda*r8/8.0;
+      if (j == 0 || tmp_cost > best_cost) {
+        best_cost = tmp_cost;
+        new_pos = j;
+      }
+    }
+    if (new_pos != old_pos) {
+      /* Move pulse from old_pos to new_pos */
+      xy = xy + x[new_pos] - x[old_pos];
+      yy = yy + 2*((ypulse[new_pos] + 1) - ypulse[old_pos]);
+
+      ypulse[old_pos]--;
+      ypulse[new_pos]++;
+    }
   }
   for (i = 0; i < n; i++) {
     if (xcoeff[i] < 0) ypulse[i] = -ypulse[i];
@@ -338,8 +396,7 @@ static int make_coded_qg(int qg, int icgr, int noref, int is_keyframe) {
  * @param [in] pvq_norm_lambda enc->pvq_norm_lambda for quantized RDO
  * @return         gain      index of the quatized gain
 */
-static int pvq_theta(daala_enc_ctx *enc,
- od_coeff *out, const od_coeff *x0, const od_coeff *r0,
+static int pvq_theta(daala_enc_ctx *enc, od_coeff *out, const od_coeff *x0, const od_coeff *r0,
  int n, int q0, od_coeff *y, int *itheta, int *max_theta, int *vk,
  double beta, double *skip_diff, int robust, int is_keyframe, int pli,
  const int16_t *qm,
@@ -518,7 +575,7 @@ static int pvq_theta(daala_enc_ctx *enc,
         /* PVQ search, using a gain of qcg*cg*sin(theta)*sin(qtheta) since
            that's the factor by which cos_dist is multiplied to get the
            distortion metric. */
-        cos_dist = pvq_search_rdo_double(xr, n - 1, k, y_tmp,
+        cos_dist = pvq_search_rdo_double(enc, xr, n - 1, k, y_tmp,
          qcg*(double)cg*sin_prod*OD_CGAIN_SCALE_2, pvq_norm_lambda);
         /* See Jmspeex' Journal of Dubious Theoretical Results. */
         dist_theta = 2 - 2.*od_pvq_cos(theta - qtheta)*OD_TRIG_SCALE_1
@@ -564,7 +621,7 @@ static int pvq_theta(daala_enc_ctx *enc,
       od_val32 qcg;
       qcg = OD_SHL(i, OD_CGAIN_SHIFT);
       k = od_pvq_compute_k(qcg, -1, -1, 1, n, beta, robust || is_keyframe);
-      cos_dist = pvq_search_rdo_double(x16, n, k, y_tmp,
+      cos_dist = pvq_search_rdo_double(enc, x16, n, k, y_tmp,
        qcg*(double)cg*OD_CGAIN_SCALE_2, pvq_norm_lambda);
       /* See Jmspeex' Journal of Dubious Theoretical Results. */
       dist = gain_weight*(qcg - cg)*(qcg - cg)
