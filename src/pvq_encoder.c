@@ -204,8 +204,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
         if (tmp_pulse >= pulse) break;
       }
 
-      /* for (j = 0; j < n; j++) { */
-      for (j = 0; j <= old_pos; j++) {
+      for (j = 0; j < n; j++) {
         od_coeff tmp_y[MAXN];
         double tmp_xy = xy;
         double tmp_yy = yy;
