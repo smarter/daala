@@ -101,6 +101,10 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
   double norm_1;
   int rdo_pulses;
   double delta_rate;
+  int pulse;
+  od_rollback_buffer buf;
+  od_encode_checkpoint(enc, &buf);
+
   xx = xy = yy = 0;
   for (j = 0; j < n; j++) {
     x[j] = fabs((float)xcoeff[j]);
@@ -160,7 +164,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
      and since x^2 and y^2 are constant, we just maximize x*y, plus a
      lambda*rate term. Note that since x and y aren't normalized here,
      we need to divide by sqrt(x^2)*sqrt(y^2). */
-  for (; i < k - 2; i++) {
+  for (; i < k; i++) {
     double rsqrt_table[4];
     int rsqrt_table_size = 4;
     int pos;
@@ -188,59 +192,60 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
   }
-  for (; i < k; i++) {
-  int r8[MAXN];
-  {
-    od_rollback_buffer buf;
-    int tell;
-    od_coeff y_tmp[MAXN];
-    /* printf("%d:", n); */
-    for (j = 0; j < n; j++) {
-      int l;
-      for (l = 0; l < n; l++) {
-        y_tmp[l] = ypulse[l];
+  if (k > 0) {
+    for (pulse = k; pulse > k-1; pulse--) {
+      double best_cost = -1e5;
+      int old_pos; /* position of pulse in y_pulse */
+      int new_pos; /* position after RDO */
+
+      int tmp_pulse = 0;
+      for (old_pos = 0; ; old_pos++) {
+        tmp_pulse += ypulse[old_pos];
+        if (tmp_pulse >= pulse) break;
       }
-      y_tmp[j]++;
 
-      tell = od_ec_enc_tell_frac(&enc->ec);
+      /* for (j = 0; j < n; j++) { */
+      for (j = 0; j <= old_pos; j++) {
+        od_coeff tmp_y[MAXN];
+        double tmp_xy = xy;
+        double tmp_yy = yy;
+        double tmp_cost;
+        int tell, r8;
+        int l;
 
-      od_encode_checkpoint(enc, &buf);
-      od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, y_tmp, n, i + 1);
-      r8[j] = od_ec_enc_tell_frac(&enc->ec)-tell;
+        for (l = 0; l < n; l++) {
+          tmp_y[l] = ypulse[l];
+        }
+        if (j != old_pos) {
+          /* Move pulse from old_pos to j */
+          tmp_xy = xy + x[j] - x[old_pos];
+          tmp_yy = yy + 2*((ypulse[j] + 1) - ypulse[old_pos]);
 
-      od_encode_rollback(enc, &buf);
-      /* printf("%c%d", j ? ',' : ' ', r8[j]); */
-    }
-    /* printf("\n"); */
-  }
-  {
-    double rsqrt_table[4];
-    int rsqrt_table_size = 4;
-    int pos;
-    double best_cost;
-    pos = 0;
-    best_cost = -1e5;
-    /*Fill the small rsqrt lookup table with inputs relative to yy.
-       Specifically, the table of n values is filled with
-       rsqrt(yy + 1), rsqrt(yy + 2 + 1) .. rsqrt(yy + 2*(n-1) + 1).*/
-    od_fill_dynamic_rqrt_table(rsqrt_table, rsqrt_table_size, yy);
-    for (j = 0; j < n; j++) {
-      double tmp_xy;
-      double tmp_yy;
-      tmp_xy = xy + x[j];
-      /*Calculate rsqrt(yy + 2*ypulse[j] + 1) using an optimized method.*/
-      tmp_yy = od_custom_rsqrt_dynamic_table(rsqrt_table, rsqrt_table_size,
-       yy, ypulse[j]);
-      tmp_xy = 2*tmp_xy*norm_1*tmp_yy - lambda*r8[j]/8.0;
-      if (j == 0 || tmp_xy > best_cost) {
-        best_cost = tmp_xy;
-        pos = j;
+          tmp_y[old_pos]--;
+          tmp_y[j]++;
+        }
+
+        tell = od_ec_enc_tell_frac(&enc->ec);
+
+        od_encode_pvq_codeword(&enc->ec, &enc->state.adapt.pvq.pvq_codeword_ctx, tmp_y, n, k);
+        r8 = od_ec_enc_tell_frac(&enc->ec)-tell;
+        od_encode_rollback(enc, &buf);
+
+        tmp_cost = 2*tmp_xy*norm_1/sqrt(tmp_yy) - lambda*r8/8.0;
+        if (j == 0 || tmp_cost > best_cost) {
+          best_cost = tmp_cost;
+          new_pos = j;
+        }
+      }
+      if (new_pos != old_pos) {
+        /* Move pulse from old_pos to new_pos */
+        xy = xy + x[new_pos] - x[old_pos];
+        yy = yy + 2*((ypulse[new_pos] + 1) - ypulse[old_pos]);
+
+        ypulse[old_pos]--;
+        ypulse[new_pos]++;
       }
     }
-    xy = xy + x[pos];
-    yy = yy + 2*ypulse[pos] + 1;
-    ypulse[pos]++;
-  }
   }
   for (i = 0; i < n; i++) {
     if (xcoeff[i] < 0) ypulse[i] = -ypulse[i];
