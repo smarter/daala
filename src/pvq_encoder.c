@@ -432,7 +432,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
            that's the factor by which cos_dist is multiplied to get the
            distortion metric. */
         cos_dist = pvq_search_rdo_double(xr, n - 1, k, y_tmp,
-         qcg*(double)cg*sin_prod*OD_CGAIN_SCALE_2, pvq_norm_lambda);
+         2*qcg*(double)cg*sin_prod*OD_CGAIN_SCALE_2, pvq_norm_lambda);
         /* See Jmspeex' Journal of Dubious Theoretical Results. */
         dist_theta = 2 - 2.*od_pvq_cos(theta - qtheta)*OD_TRIG_SCALE_1
          + sin_prod*(2 - 2*cos_dist);
@@ -471,7 +471,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
       qcg = OD_SHL(i, OD_CGAIN_SHIFT);
       k = od_pvq_compute_k(qcg, -1, -1, 1, n, beta, robust || is_keyframe);
       cos_dist = pvq_search_rdo_double(x16, n, k, y_tmp,
-       qcg*(double)cg*OD_CGAIN_SCALE_2, pvq_norm_lambda);
+       2*qcg*(double)cg*OD_CGAIN_SCALE_2, pvq_norm_lambda);
       /* See Jmspeex' Journal of Dubious Theoretical Results. */
       dist = gain_weight*(qcg - cg)*(qcg - cg)
        + qcg*(double)cg*(2 - 2*cos_dist);
