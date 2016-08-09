@@ -192,7 +192,7 @@ static double pvq_search_rdo_double(daala_enc_ctx *enc, const od_val16 *xcoeff, 
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
   }
-  for (pulse = k; pulse > OD_MAXI(k-2, 0); pulse--) {
+  for (pulse = k; pulse > 0; pulse--) {
     double best_cost = -1e5;
     int old_pos; /* position of pulse in y_pulse */
     int new_pos; /* position after RDO */
