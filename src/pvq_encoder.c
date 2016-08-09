@@ -132,6 +132,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
   /* Rough assumption for now, the last position costs about 3 bits more than
      the first. */
   delta_rate = 3./n;
+#if 0
   /* Search one pulse at a time */
   for (; i < k - rdo_pulses; i++) {
     int pos;
@@ -156,6 +157,7 @@ static double pvq_search_rdo_double(const od_val16 *xcoeff, int n, int k,
     yy = yy + 2*ypulse[pos] + 1;
     ypulse[pos]++;
   }
+#endif
   /* Search last pulses with RDO. Distortion is D = (x-y)^2 = x^2 - 2*x*y + y^2
      and since x^2 and y^2 are constant, we just maximize x*y, plus a
      lambda*rate term. Note that since x and y aren't normalized here,
