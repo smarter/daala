@@ -452,7 +452,7 @@ static int pvq_theta(daala_enc_ctx *enc, od_coeff *out, const od_coeff *x0, cons
   double rate, best_rate;
   int coded_qg, best_coded_qg;
   /* Give more weight to gain error when calculating the total distortion. */
-  gain_weight = 1.0;
+  gain_weight = 1.4;
   OD_ASSERT(n > 1);
   corr = 0;
 #if !defined(OD_FLOAT_PVQ)
