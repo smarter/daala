@@ -814,7 +814,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   int possible_skip_rest;
   double computed_rate, actual_rate, skip_cdf_rate;
   double pvq_norm_lambda;
-  pvq_norm_lambda = enc->pvq_norm_lambda * 1.2672414;
+  pvq_norm_lambda = enc->pvq_norm_lambda;
 #if !OD_SIGNAL_Q_SCALING
   OD_UNUSED(q_scaling);
   OD_UNUSED(bx);
