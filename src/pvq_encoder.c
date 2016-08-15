@@ -813,6 +813,8 @@ int od_pvq_encode(daala_enc_ctx *enc,
   double dc_rate;
   int possible_skip_rest;
   double computed_rate, actual_rate, skip_cdf_rate;
+  double pvq_norm_lambda;
+  pvq_norm_lambda = enc->pvq_norm_lambda * 1.2672414;
 #if !OD_SIGNAL_Q_SCALING
   OD_UNUSED(q_scaling);
   OD_UNUSED(bx);
@@ -868,7 +870,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     qg[i] = pvq_theta(enc, out + off[i], in + off[i], ref + off[i], size[i],
      q, y + off[i], &theta[i], &max_theta[i],
      &k[i], beta[i], &skip_diff, robust, is_keyframe, pli,
-     qm + off[i], qm_inv + off[i], enc->pvq_norm_lambda,
+     qm + off[i], qm_inv + off[i], pvq_norm_lambda,
      model, &enc->state.adapt, exg + i, ext + i,
      robust || is_keyframe, (pli != 0)*OD_NBSIZES*PVQ_MAX_PARTITIONS
      + bs*PVQ_MAX_PARTITIONS + i, 0,
@@ -892,7 +894,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     dc_rate = -OD_LOG2((double)(skip_cdf[3] - skip_cdf[2])/
      (double)(skip_cdf[2] - skip_cdf[1]));
     out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
-     enc->pvq_norm_lambda);
+     pvq_norm_lambda);
   }
   actual_rate = 0;
   tell = od_ec_enc_tell_frac(&enc->ec);
@@ -939,13 +941,13 @@ int od_pvq_encode(daala_enc_ctx *enc,
     }
     tell -= (int)floor(.5+8*skip_rate);
   }
-  if (nb_bands == 0 || skip_diff <= enc->pvq_norm_lambda/8*tell) {
+  if (nb_bands == 0 || skip_diff <= pvq_norm_lambda/8*tell) {
     if (is_keyframe) out[0] = 0;
     else {
       dc_rate = -OD_LOG2((double)(skip_cdf[1] - skip_cdf[0])/
        (double)skip_cdf[0]);
       out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
-       enc->pvq_norm_lambda);
+       pvq_norm_lambda);
     }
     /* We decide to skip, roll back everything as it was before. */
     od_encode_rollback(enc, &buf);
