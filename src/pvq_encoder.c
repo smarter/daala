@@ -894,7 +894,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     dc_rate = -OD_LOG2((double)(skip_cdf[3] - skip_cdf[2])/
      (double)(skip_cdf[2] - skip_cdf[1]));
     out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
-     pvq_norm_lambda);
+     0.147);
   }
   actual_rate = 0;
   tell = od_ec_enc_tell_frac(&enc->ec);
@@ -947,7 +947,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
       dc_rate = -OD_LOG2((double)(skip_cdf[1] - skip_cdf[0])/
        (double)skip_cdf[0]);
       out[0] = od_rdo_quant(in[0] - ref[0], dc_quant, dc_rate,
-       pvq_norm_lambda);
+       0.147);
     }
     /* We decide to skip, roll back everything as it was before. */
     od_encode_rollback(enc, &buf);
