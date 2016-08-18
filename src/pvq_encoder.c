@@ -941,7 +941,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     }
     tell -= (int)floor(.5+8*skip_rate);
   }
-  if (nb_bands == 0 || skip_diff <= pvq_norm_lambda/8*tell) {
+  if (nb_bands == 0 || skip_diff <= 0.147/8*tell) {
     if (is_keyframe) out[0] = 0;
     else {
       dc_rate = -OD_LOG2((double)(skip_cdf[1] - skip_cdf[0])/
