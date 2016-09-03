@@ -705,25 +705,28 @@ static void pvq_encode_partition(od_ec_enc *ec,
 /** Quantizes a scalar with rate-distortion optimization (RDO)
  * @param [in] x      unquantized value
  * @param [in] q      quantization step size
- * @param [in] delta0 rate increase for encoding a 1 instead of a 0
+ * @param [in] delta0 rate increase for encoding a n instead of a 0
  * @param [in] pvq_norm_lambda enc->pvq_norm_lambda for quantized RDO
  * @retval quantized value
  */
 int od_rdo_quant(od_coeff x, int q, double delta0, double pvq_norm_lambda) {
-  int n, threshold;
-  /* Optimal quantization threshold is 1/2 + lambda*delta_rate/2. See
+  int m, n, threshold;
+  m = OD_DIV_R0(x, q);
+  n = abs(m);
+  /*Decide whether we should quantize x as m or 0.
+    0 is RD-optimal if |x|/q < n/2 + lambda*delta_rate/(2*n). See
      Jmspeex' Journal of Dubious Theoretical Results for details. */
-  n = OD_DIV_R0(abs(x), q);
 #if 0
-  threshold = n*128 + OD_CLAMPI(0, (int)(256*pvq_norm_lambda*delta0/(2*n)), 128*n);
-  if (abs(x) < q*threshold/256) {
+  /* threshold = n*128 + OD_CLAMPI(0, (int)(256*pvq_norm_lambda*delta0/(2*n)), 128*n); */
+  threshold = n*128 + OD_MAXI(0, (int)(256*pvq_norm_lambda*delta0/(2*n)));
+  if (256*abs(x) < q*threshold) {
 #else
   if ((double)abs(x)/q < (double)n/2 + pvq_norm_lambda*delta0/(2*n)) {
 #endif
     return 0;
   }
   else {
-    return OD_DIV_R0(x, q);
+    return m;
   }
 }
 
